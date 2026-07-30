@@ -1,0 +1,41 @@
+services:
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1000
+    volumes:
+      - valkey-data:/data
+    networks:
+      - apply-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  scraper:
+    build:
+      context: ../scraper-go
+    environment:
+      VALKEY_URL: redis://valkey:6379
+      GO_SCRAPER_ADDR: ":8081"
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks:
+      - apply-net
+    restart: unless-stopped
+    depends_on:
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  apply-net:
+    name: apply-net
+
+volumes:
+  valkey-data:
