@@ -60,9 +60,11 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
     await page.goto(job.url, { waitUntil: "domcontentloaded" });
 
     const applyButton = page
-      .locator('button:has-text("Quero me candidatar"), a:has-text("Quero me candidatar"), button:has-text("Candidatar")')
+      .locator('a:has-text("Candidatar"), button:has-text("Candidatar"), a:has-text("Quero me candidatar"), button:has-text("Quero me candidatar")')
       .first();
-    if ((await applyButton.count()) === 0) {
+    try {
+      await applyButton.waitFor({ state: "visible", timeout: 15000 });
+    } catch {
       const shot = await saveScreenshot(page, applicationId);
       return { status: "needs_review", note: `botão de candidatura não encontrado (vaga encerrada?) — ${shot}` };
     }
