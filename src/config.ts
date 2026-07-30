@@ -22,6 +22,17 @@ const criteriosSchema = z.object({
 
 export type Criterios = z.infer<typeof criteriosSchema>;
 
+const candidatoSchema = z.object({
+  nome: z.string(),
+  sobrenome: z.string(),
+  email: z.string(),
+  telefone: z.string(),
+  linkedin: z.string(),
+  github: z.string(),
+});
+
+export type Candidato = z.infer<typeof candidatoSchema>;
+
 const paths = {
   root: process.cwd(),
   dataDir: "data",
@@ -29,11 +40,25 @@ const paths = {
   criteriosPath: "profile/criterios.json",
   perfilPath: "profile/perfil.md",
   curriculoPath: "profile/curriculo.pdf",
+  candidatoPath: "profile/candidato.json",
+  gupySessionPath: "profile/sessions/gupy.json",
+  screenshotsDir: "data/screenshots",
 };
 
 function loadCriterios(): Criterios {
   const raw = readFileSync(paths.criteriosPath, "utf-8");
   return criteriosSchema.parse(JSON.parse(raw));
+}
+
+function loadCandidato(): Candidato | null {
+  try {
+    const raw = readFileSync(paths.candidatoPath, "utf-8");
+    const candidato = candidatoSchema.parse(JSON.parse(raw));
+    if (Object.values(candidato).some((v) => v.includes("<preencher>"))) return null;
+    return candidato;
+  } catch {
+    return null;
+  }
 }
 
 export const config = {
@@ -43,4 +68,5 @@ export const config = {
   discordWebhookUrl: env.DISCORD_WEBHOOK_URL,
   paths,
   criterios: loadCriterios(),
+  candidato: loadCandidato(),
 };
