@@ -1,0 +1,9 @@
+{
+  "keywords": ["node", "typescript", "vue", "nestjs"],
+  "remoteOnly": true,
+  "senioridade": ["pleno", "senior"],
+  "locais": ["Brasil", "Remoto"],
+  "tetoDiario": 15,
+  "cooldownEmpresaDias": 30,
+  "minScore": 3
+}
