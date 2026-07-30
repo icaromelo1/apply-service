@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
+const emptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
+
 const envSchema = z.object({
-  SCRAPER_URL: z.string().url().default("http://127.0.0.1:8081"),
-  GUPY_BASE_URL: z.string().url().default("https://employability-portal.gupy.io"),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  DISCORD_WEBHOOK_URL: z.string().url().optional(),
+  SCRAPER_URL: z.preprocess(emptyToUndefined, z.string().url().default("http://127.0.0.1:8081")),
+  GUPY_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().default("https://employability-portal.gupy.io")),
+  ANTHROPIC_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  DISCORD_WEBHOOK_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
 });
 
 const env = envSchema.parse(process.env);
