@@ -104,6 +104,21 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
       await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
     }
 
+    const responderAgora = page.locator('button:has-text("Responder agora")').first();
+    if (await responderAgora.isVisible().catch(() => false)) {
+      if (!config.anthropicApiKey) {
+        const shot = await saveScreenshot(page, applicationId);
+        return {
+          status: "needs_review",
+          note: `vaga tem questionário da empresa e ANTHROPIC_API_KEY não está configurada — responder manualmente — ${shot}`,
+        };
+      }
+      try {
+        await responderAgora.click({ timeout: 5000 });
+        await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+      } catch {}
+    }
+
     const extracted = await extractPerguntas(page);
     let respostas: Resposta[] = [];
     if (extracted.length > 0) {
