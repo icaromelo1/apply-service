@@ -7,38 +7,56 @@ import { getBrowser, saveScreenshot, type ApplyOutcome } from "./browser.js";
 
 const AUTO_SUBMIT = process.env.GUPY_AUTO_SUBMIT === "true";
 
+function normalize(s: string | null | undefined): string {
+  return (s ?? "").replace(/\s+/g, " ").trim();
+}
+
 async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta; locator: Locator }[]> {
   const result: { pergunta: Pergunta; locator: Locator }[] = [];
-  const groups = page.locator("form fieldset, form [role=group], form [data-testid*=question]");
-  const count = await groups.count();
+  const headings = page.locator("h3").filter({ hasText: /^\s*\d+\s*\./ });
+  const count = await headings.count();
 
   for (let i = 0; i < count; i++) {
-    const group = groups.nth(i);
-    const label = (await group.locator("legend, label, p").first().textContent().catch(() => null))?.trim();
+    const heading = headings.nth(i);
+    const wrapper = heading.locator("xpath=ancestor::div[2]");
+    const label = normalize(await heading.textContent().catch(() => null))
+      .replace(/^\d+\s*\.\s*/, "")
+      .replace(/\s*\*\s*$/, "");
     if (!label) continue;
 
-    const opcoes = (
-      await group.locator("label:has(input[type=radio]), label:has(input[type=checkbox]), option").allTextContents()
-    )
-      .map((o) => o.trim())
-      .filter((o) => o && !/selecione/i.test(o));
+    const opcoes = (await wrapper.locator("label .MuiFormControlLabel-label").allTextContents())
+      .map(normalize)
+      .filter(Boolean);
 
-    result.push({ pergunta: { pergunta: label, opcoes: opcoes.length > 0 ? opcoes : undefined }, locator: group });
+    result.push({ pergunta: { pergunta: label, opcoes: opcoes.length > 0 ? opcoes : undefined }, locator: wrapper });
   }
   return result;
 }
 
 async function fillAnswer(group: Locator, resposta: string): Promise<boolean> {
-  const radio = group.locator(`label:has-text("${resposta}") input[type=radio]`).first();
-  if ((await radio.count()) > 0) {
-    await radio.check();
-    return true;
+  const parts = resposta
+    .split(/\s*\|\s*/)
+    .map(normalize)
+    .filter(Boolean);
+
+  let marked = false;
+  const labels = group.locator("label:has(input[type=radio]), label:has(input[type=checkbox])");
+  const labelCount = await labels.count();
+  for (let i = 0; i < labelCount; i++) {
+    const text = normalize(await labels.nth(i).textContent().catch(() => null));
+    if (parts.includes(text)) {
+      await labels.nth(i).click().catch(() => {});
+      marked = true;
+    }
   }
+  if (marked) return true;
+
   const select = group.locator("select").first();
   if ((await select.count()) > 0) {
     await select.selectOption({ label: resposta }).catch(() => select.selectOption(resposta));
     return true;
   }
+
   const textInput = group.locator("textarea, input[type=text], input[type=number]").first();
   if ((await textInput.count()) > 0) {
     await textInput.fill(resposta);
