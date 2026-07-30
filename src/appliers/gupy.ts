@@ -206,7 +206,8 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
     }
 
     if ((await confirmation.count()) > 0) {
-      return { status: "applied", answers: answersJson };
+      const proof = await saveScreenshot(page, applicationId);
+      return { status: "applied", note: `confirmada — evidência: ${proof}`, answers: answersJson };
     }
 
     const shot = await saveScreenshot(page, applicationId);
