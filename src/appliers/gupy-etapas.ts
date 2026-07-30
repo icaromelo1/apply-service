@@ -61,11 +61,22 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
     }
 
     const links: string[] = [];
-    const anchors = page.locator('a:has-text("Ver andamento")');
-    const anchorCount = await anchors.count();
-    for (let i = 0; i < anchorCount; i++) {
-      const href = await anchors.nth(i).getAttribute("href").catch(() => null);
-      if (href) links.push(href.startsWith("http") ? href : `https://portal.gupy.io${href}`);
+    for (let pagina = 0; pagina < 10; pagina++) {
+      const anchors = page.locator('a:has-text("Ver andamento")');
+      const anchorCount = await anchors.count();
+      for (let i = 0; i < anchorCount; i++) {
+        const href = await anchors.nth(i).getAttribute("href").catch(() => null);
+        if (!href) continue;
+        const absolute = href.startsWith("http") ? href : `https://portal.gupy.io${href}`;
+        if (!links.includes(absolute)) links.push(absolute);
+      }
+
+      const proxima = page
+        .locator('button[aria-label*="róxima" i]:not([disabled]), [aria-label*="next" i]:not([disabled]), a[rel=next]')
+        .first();
+      if (!(await proxima.isVisible().catch(() => false))) break;
+      await proxima.click().catch(() => {});
+      await page.waitForTimeout(2500);
     }
     console.log(`[etapas] ${links.length} candidatura(s) em andamento`);
 
