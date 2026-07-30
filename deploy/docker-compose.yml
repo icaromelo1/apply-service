@@ -33,9 +33,42 @@ services:
       timeout: 5s
       retries: 3
 
+  apply:
+    build:
+      context: ../apply-service
+    environment:
+      SCRAPER_URL: http://scraper:8081
+      TZ: America/Manaus
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      REVIEW_PASSWORD: ${REVIEW_PASSWORD:-}
+      GUPY_AUTO_SUBMIT: ${GUPY_AUTO_SUBMIT:-false}
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - ../apply-service/profile:/app/profile
+      - apply-data:/app/data
+    networks:
+      - apply-net
+      - web
+    restart: unless-stopped
+    depends_on:
+      scraper:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.apply.rule=Host(`apply.icaromelodev.com.br`)
+      - traefik.http.routers.apply.entrypoints=websecure
+      - traefik.http.routers.apply.tls.certresolver=le
+      - traefik.http.services.apply.loadbalancer.server.port=8090
+      - traefik.docker.network=web
+
 networks:
   apply-net:
     name: apply-net
+  web:
+    external: true
 
 volumes:
   valkey-data:
+  apply-data:
