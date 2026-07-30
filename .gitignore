@@ -5,3 +5,8 @@ profile/curriculo.pdf
 profile/sessions/
 dist/
 profile/curriculo-*.pdf
+profile/perfil.md
+profile/candidato.json
+profile/criterios.json
+run-etapas.mts
+*.mts
