@@ -137,6 +137,13 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
       } catch {}
     }
 
+    await page
+      .locator("h3")
+      .filter({ hasText: /^\s*\d+\s*\./ })
+      .first()
+      .waitFor({ state: "visible", timeout: 20000 })
+      .catch(() => {});
+
     const extracted = await extractPerguntas(page);
     let respostas: Resposta[] = [];
     if (extracted.length > 0) {
