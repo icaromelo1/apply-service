@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
 import { config } from "../config.js";
@@ -19,9 +19,10 @@ export async function closeBrowser(): Promise<void> {
 
 export async function saveScreenshot(page: Page, applicationId: number): Promise<string> {
   mkdirSync(config.paths.screenshotsDir, { recursive: true });
-  const path = join(config.paths.screenshotsDir, `${applicationId}-${Date.now()}.png`);
-  await page.screenshot({ path, fullPage: true });
-  return path;
+  const base = join(config.paths.screenshotsDir, `${applicationId}-${Date.now()}`);
+  await page.screenshot({ path: `${base}.png`, fullPage: true });
+  await page.content().then((html) => writeFileSync(`${base}.html`, html)).catch(() => {});
+  return `${base}.png`;
 }
 
 export async function hasCaptcha(page: Page): Promise<boolean> {
