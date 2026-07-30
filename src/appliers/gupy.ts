@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import type { Locator, Page } from "playwright";
 import { config } from "../config.js";
-import { responderQuestionario, type Pergunta, type Resposta } from "../llm.js";
+import { llmAvailable, responderQuestionario, type Pergunta, type Resposta } from "../llm.js";
 import type { Job } from "../types.js";
 import { getBrowser, saveScreenshot, type ApplyOutcome } from "./browser.js";
 
@@ -106,11 +106,11 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
 
     const responderAgora = page.locator('button:has-text("Responder agora")').first();
     if (await responderAgora.isVisible().catch(() => false)) {
-      if (!config.anthropicApiKey) {
+      if (!llmAvailable()) {
         const shot = await saveScreenshot(page, applicationId);
         return {
           status: "needs_review",
-          note: `vaga tem questionário da empresa e ANTHROPIC_API_KEY não está configurada — responder manualmente — ${shot}`,
+          note: `vaga tem questionário da empresa e nenhuma chave de LLM está configurada (GEMINI_API_KEY ou ANTHROPIC_API_KEY) — responder manualmente — ${shot}`,
         };
       }
       try {

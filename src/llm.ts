@@ -1,20 +1,24 @@
 import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
 import { config } from "./config.js";
 import type { Job } from "./types.js";
 
-const MODEL = "claude-opus-5";
-const BETAS = ["server-side-fallback-2026-07-01"];
+const ANTHROPIC_MODEL = "claude-opus-5";
+const ANTHROPIC_BETAS = ["server-side-fallback-2026-07-01"];
 
-let client: Anthropic | null = null;
+const COVER_LETTER_SYSTEM =
+  "Você escreve cover letters curtas e específicas para candidaturas a vagas de tecnologia. Use exclusivamente os fatos do perfil do candidato fornecido — nunca invente experiências, números ou tecnologias. Escreva no idioma do anúncio da vaga. Máximo de 3 parágrafos, tom profissional e direto, sem clichês genéricos, conectando a experiência real do candidato aos requisitos da vaga. Responda apenas com o texto da cover letter, sem preâmbulo.";
 
-function getClient(): Anthropic {
-  if (!config.anthropicApiKey) {
-    throw new Error("ANTHROPIC_API_KEY não configurada — módulo LLM indisponível");
-  }
-  client ??= new Anthropic({ apiKey: config.anthropicApiKey });
-  return client;
+const QUESTIONARIO_SYSTEM =
+  "Você responde questionários de candidatura a vagas em nome de um candidato, usando EXCLUSIVAMENTE os fatos do perfil fornecido. Regra absoluta: se a resposta de uma pergunta não estiver clara e diretamente no perfil, retorne resposta null para ela — nunca chute, nunca infira além do escrito. Perguntas eliminatórias respondidas errado prejudicam o candidato; null é sempre melhor que um palpite. Quando houver opções, a resposta deve ser exatamente uma das opções fornecidas. Responda no idioma da pergunta.";
+
+let anthropicClient: Anthropic | null = null;
+let geminiClient: GoogleGenAI | null = null;
+
+export function llmAvailable(): boolean {
+  return Boolean(config.geminiApiKey || config.anthropicApiKey);
 }
 
 function loadPerfil(): string {
@@ -30,37 +34,6 @@ function jobContext(job: Job): string {
   ]
     .filter(Boolean)
     .join("\n");
-}
-
-function extractText(response: Anthropic.Beta.BetaMessage): string {
-  if (response.stop_reason === "refusal") {
-    throw new Error(`LLM recusou a requisição (categoria: ${response.stop_details?.category ?? "desconhecida"})`);
-  }
-  const block = response.content.find((b) => b.type === "text");
-  if (!block || block.type !== "text") {
-    throw new Error("resposta do LLM sem bloco de texto");
-  }
-  return block.text;
-}
-
-export async function gerarCoverLetter(job: Job): Promise<string> {
-  const response = await getClient().beta.messages.create({
-    model: MODEL,
-    max_tokens: 2048,
-    betas: BETAS,
-    fallbacks: "default",
-    output_config: { effort: "medium" },
-    system:
-      "Você escreve cover letters curtas e específicas para candidaturas a vagas de tecnologia. Use exclusivamente os fatos do perfil do candidato fornecido — nunca invente experiências, números ou tecnologias. Escreva no idioma do anúncio da vaga. Máximo de 3 parágrafos, tom profissional e direto, sem clichês genéricos, conectando a experiência real do candidato aos requisitos da vaga. Responda apenas com o texto da cover letter, sem preâmbulo.",
-    messages: [
-      {
-        role: "user",
-        content: `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}`,
-      },
-    ],
-  });
-
-  return extractText(response).trim();
 }
 
 export interface Pergunta {
@@ -82,50 +55,133 @@ const respostasSchema = z.object({
   ),
 });
 
-const respostasJsonSchema = {
-  type: "object",
-  properties: {
-    respostas: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          pergunta: { type: "string" },
-          resposta: { anyOf: [{ type: "string" }, { type: "null" }] },
-        },
-        required: ["pergunta", "resposta"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["respostas"],
-  additionalProperties: false,
-} as const;
-
-export async function responderQuestionario(job: Job, perguntas: Pergunta[]): Promise<Resposta[]> {
-  const perguntasTexto = perguntas
+function perguntasTexto(perguntas: Pergunta[]): string {
+  return perguntas
     .map((p, i) => `${i + 1}. ${p.pergunta}${p.opcoes?.length ? `\n   Opções: ${p.opcoes.join(" | ")}` : ""}`)
     .join("\n");
+}
 
-  const response = await getClient().beta.messages.create({
-    model: MODEL,
-    max_tokens: 4096,
-    betas: BETAS,
-    fallbacks: "default",
-    output_config: {
-      effort: "medium",
-      format: { type: "json_schema", schema: respostasJsonSchema },
-    },
-    system:
-      "Você responde questionários de candidatura a vagas em nome de um candidato, usando EXCLUSIVAMENTE os fatos do perfil fornecido. Regra absoluta: se a resposta de uma pergunta não estiver clara e diretamente no perfil, retorne resposta null para ela — nunca chute, nunca infira além do escrito. Perguntas eliminatórias respondidas errado prejudicam o candidato; null é sempre melhor que um palpite. Quando houver opções, a resposta deve ser exatamente uma das opções fornecidas. Responda no idioma da pergunta.",
-    messages: [
-      {
-        role: "user",
-        content: `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}\n\nPerguntas do questionário:\n${perguntasTexto}`,
+function getGemini(): GoogleGenAI {
+  geminiClient ??= new GoogleGenAI({ apiKey: config.geminiApiKey });
+  return geminiClient;
+}
+
+function getAnthropic(): Anthropic {
+  anthropicClient ??= new Anthropic({ apiKey: config.anthropicApiKey });
+  return anthropicClient;
+}
+
+function extractAnthropicText(response: Anthropic.Beta.BetaMessage): string {
+  if (response.stop_reason === "refusal") {
+    throw new Error(`LLM recusou a requisição (categoria: ${response.stop_details?.category ?? "desconhecida"})`);
+  }
+  const block = response.content.find((b) => b.type === "text");
+  if (!block || block.type !== "text") {
+    throw new Error("resposta do LLM sem bloco de texto");
+  }
+  return block.text;
+}
+
+export async function gerarCoverLetter(job: Job): Promise<string> {
+  const userContent = `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}`;
+
+  if (config.geminiApiKey) {
+    const response = await getGemini().models.generateContent({
+      model: config.geminiModel,
+      contents: userContent,
+      config: { systemInstruction: COVER_LETTER_SYSTEM },
+    });
+    const text = response.text;
+    if (!text) throw new Error("Gemini retornou resposta vazia");
+    return text.trim();
+  }
+
+  if (config.anthropicApiKey) {
+    const response = await getAnthropic().beta.messages.create({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 2048,
+      betas: ANTHROPIC_BETAS,
+      fallbacks: "default",
+      output_config: { effort: "medium" },
+      system: COVER_LETTER_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+    });
+    return extractAnthropicText(response).trim();
+  }
+
+  throw new Error("nenhuma chave de LLM configurada (GEMINI_API_KEY ou ANTHROPIC_API_KEY)");
+}
+
+export async function responderQuestionario(job: Job, perguntas: Pergunta[]): Promise<Resposta[]> {
+  const userContent = `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}\n\nPerguntas do questionário:\n${perguntasTexto(perguntas)}`;
+
+  if (config.geminiApiKey) {
+    const response = await getGemini().models.generateContent({
+      model: config.geminiModel,
+      contents: userContent,
+      config: {
+        systemInstruction: QUESTIONARIO_SYSTEM,
+        responseMimeType: "application/json",
+        responseJsonSchema: {
+          type: Type.OBJECT,
+          properties: {
+            respostas: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  pergunta: { type: Type.STRING },
+                  resposta: { type: Type.STRING, nullable: true },
+                },
+                required: ["pergunta", "resposta"],
+              },
+            },
+          },
+          required: ["respostas"],
+        },
       },
-    ],
-  });
+    });
+    const text = response.text;
+    if (!text) throw new Error("Gemini retornou resposta vazia");
+    return respostasSchema.parse(JSON.parse(text)).respostas;
+  }
 
-  const parsed = respostasSchema.parse(JSON.parse(extractText(response)));
-  return parsed.respostas;
+  if (config.anthropicApiKey) {
+    const response = await getAnthropic().beta.messages.create({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 4096,
+      betas: ANTHROPIC_BETAS,
+      fallbacks: "default",
+      output_config: {
+        effort: "medium",
+        format: {
+          type: "json_schema",
+          schema: {
+            type: "object",
+            properties: {
+              respostas: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    pergunta: { type: "string" },
+                    resposta: { anyOf: [{ type: "string" }, { type: "null" }] },
+                  },
+                  required: ["pergunta", "resposta"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["respostas"],
+            additionalProperties: false,
+          },
+        },
+      },
+      system: QUESTIONARIO_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+    });
+    return respostasSchema.parse(JSON.parse(extractAnthropicText(response))).respostas;
+  }
+
+  throw new Error("nenhuma chave de LLM configurada (GEMINI_API_KEY ou ANTHROPIC_API_KEY)");
 }
