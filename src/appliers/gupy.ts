@@ -91,11 +91,16 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
       await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
     }
 
-    const continuar = page
-      .locator('button:has-text("Continuar"), button:has-text("Avançar"), button:has-text("Próximo")')
-      .first();
-    for (let step = 0; step < 3 && (await continuar.isVisible().catch(() => false)); step++) {
-      await continuar.click();
+    for (let step = 0; step < 3; step++) {
+      const continuar = page
+        .locator('button:has-text("Continuar"), button:has-text("Avançar"), button:has-text("Próximo")')
+        .first();
+      if (!(await continuar.isVisible().catch(() => false))) break;
+      try {
+        await continuar.click({ timeout: 5000 });
+      } catch {
+        break;
+      }
       await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
     }
 
