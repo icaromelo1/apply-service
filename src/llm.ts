@@ -11,8 +11,13 @@ const ANTHROPIC_BETAS = ["server-side-fallback-2026-07-01"];
 const COVER_LETTER_SYSTEM =
   "Você escreve cover letters curtas e específicas para candidaturas a vagas de tecnologia. Use exclusivamente os fatos do perfil do candidato fornecido — nunca invente experiências, números ou tecnologias. Escreva no idioma do anúncio da vaga. Máximo de 3 parágrafos, tom profissional e direto, sem clichês genéricos, conectando a experiência real do candidato aos requisitos da vaga. Responda apenas com o texto da cover letter, sem preâmbulo.";
 
-const QUESTIONARIO_SYSTEM =
-  "Você responde questionários de candidatura a vagas em nome de um candidato, usando EXCLUSIVAMENTE os fatos do perfil fornecido. Regra absoluta: se a resposta de uma pergunta não estiver clara e diretamente no perfil, retorne resposta null para ela — nunca chute, nunca infira além do escrito. Perguntas eliminatórias respondidas errado prejudicam o candidato; null é sempre melhor que um palpite. Quando houver opções, a resposta deve ser exatamente uma das opções fornecidas; se a pergunta for de múltipla escolha (caixas de seleção) e mais de uma opção se aplicar, separe as opções com ' | '. Perguntas explicitamente opcionais que não se aplicam ao candidato (ex: matrícula de indicação, campo só para colaboradores) podem ser respondidas com string vazia. Responda no idioma da pergunta.";
+const QUESTIONARIO_SYSTEM = `Você responde questionários de candidatura a vagas em nome de um candidato, usando os fatos do perfil fornecido.
+
+REGRA FACTUAL (perguntas sobre fatos verificáveis — anos de experiência, tecnologias dominadas, salário, formação, certificações, disponibilidade, dados pessoais): responda EXCLUSIVAMENTE com o que está no perfil. Se o fato não estiver lá, retorne null. Nunca invente experiência que o candidato não tem, nunca infle anos, nunca chute valores. Perguntas eliminatórias respondidas erradas prejudicam o candidato; null é sempre melhor que um palpite.
+
+REGRA SUBJETIVA (perguntas de fit cultural, motivação, valores, estilo de trabalho, "por que essa vaga", "como você lida com X", "o que te motiva"): componha uma resposta verdadeira a partir das seções de perfil comportamental, experiências e desafios, conectando-as ao contexto REAL da vaga (empresa, produto, stack e valores citados na descrição). Destaque o que genuinamente se alinha e escreva na primeira pessoa, de forma concreta e específica — cite fatos e experiências reais do perfil em vez de adjetivos genéricos. Máximo de 4 a 6 linhas. Nunca afirme afinidade com valor, causa ou tecnologia que não tenha respaldo no perfil; se a pergunta subjetiva não tiver nenhum respaldo factual no perfil, retorne null.
+
+FORMATO: quando houver opções, a resposta deve ser exatamente uma das opções fornecidas; se for múltipla escolha (caixas de seleção) e mais de uma se aplicar, separe as opções com ' | '. Perguntas explicitamente opcionais que não se aplicam (matrícula de indicação, campo só para colaboradores) podem ser respondidas com string vazia. Responda sempre no idioma da pergunta.`;
 
 let anthropicClient: Anthropic | null = null;
 let geminiClient: GoogleGenAI | null = null;

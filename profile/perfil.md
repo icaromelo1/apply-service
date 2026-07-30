@@ -104,6 +104,25 @@ Observação: atua simultaneamente na Cast Group (CLT) e na DSG (PJ), ambas remo
   conforme as opções); quando o campo for dissertativo, complementar com a experiência equivalente mais
   próxima (ex: "não atuei com C#, mas tenho 5 anos de Node.js/TypeScript no backend").
 
+## Perfil comportamental e fit cultural (fatos reais — usar para perguntas subjetivas)
+
+- Motivação principal hoje: IA — quer evoluir de usuário para construtor de integrações e sistemas
+  multiagentes. Já introduziu sistemas multiagentes e orquestração de LLMs na equipe da DSG.
+- Direção de carreira: mesclar liderança técnica com mão na massa; não busca gestão pura.
+- Autonomia: responsável único por 3 sistemas críticos de um tribunal, do design da arquitetura ao
+  deploy em Kubernetes, com mínima supervisão.
+- Trabalho em equipe: foi Tech Lead na iColabora (4 projetos simultâneos), fazia code review, treinava
+  desenvolvedores, alinhava entregas com clientes e P.O. em SCRUM/Kanban; implantou cultura de testes
+  (BDD com Cypress/Cucumber/Jest) no time.
+- Como resolve problemas: reproduz e documenta antes de corrigir (input, output esperado vs. real);
+  corrige na origem em vez de aplicar curativo; se trava por ~30 minutos, muda de abordagem.
+- Critério de decisão técnica: performance > legibilidade > consistência com o codebase; refatora
+  depois que funciona, nunca no meio da feature; respeita o padrão do código legado alheio.
+- Sob pressão: entrega em incrementos, preservando tratamento de erro.
+- Aprendizado: pergunta a quem sabe, depois documentação oficial, depois outras fontes.
+- Volume de entrega: ~2.663 commits em 18 meses (média ~148/mês) — cadência alta e consistente.
+- Fins de semana são dedicados à faculdade (ADS na UNIFOR).
+
 ## Resposta padrão — "maior desafio profissional" (adaptar ao contexto da pergunta)
 
 Tenho 5 anos de experiência com desenvolvimento de produtos digitais. Meu desafio mais complexo recente
