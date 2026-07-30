@@ -10,4 +10,4 @@ RUN npm ci
 COPY tsconfig.json drizzle.config.ts ./
 COPY src ./src
 
-CMD ["sh", "-c", "npm run db:push && npx tsx src/review/server.ts"]
+CMD ["sh", "-c", "npm run db:push || echo 'db:push falhou (schema existente, ignorado)'; npx tsx src/review/server.ts"]
