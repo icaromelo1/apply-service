@@ -1,4 +1,6 @@
+import { resolverEtapasGupy } from "./appliers/gupy-etapas.js";
 import { runAppliers } from "./appliers/index.js";
+import { closeBrowser } from "./appliers/browser.js";
 import { runDigest } from "./digest.js";
 import { ingestGupy } from "./ingest/gupy.js";
 import { ingestScraper } from "./ingest/scraper.js";
@@ -32,6 +34,15 @@ async function main(): Promise<void> {
 
   const applied = await runAppliers();
   console.log("[appliers]", applied);
+
+  try {
+    const etapas = await resolverEtapasGupy();
+    console.log("[etapas]", etapas);
+  } catch (err) {
+    console.error("[etapas] falhou:", err instanceof Error ? err.message : err);
+  } finally {
+    await closeBrowser();
+  }
 
   try {
     const digested = await runDigest();
