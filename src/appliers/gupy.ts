@@ -180,7 +180,9 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
       };
     }
 
-    const confirmation = page.locator("text=/candidatura (enviada|realizada|concluída|recebida|efetuada)|boa sorte/i");
+    const confirmation = page.locator(
+      "text=/candidatura (enviada|realizada|concluída|recebida|efetuada|finalizada)|atualização para a sua candidatura|boa sorte/i",
+    );
     const submitTexts = ["Salvar e continuar", "Enviar candidatura", "Finalizar candidatura", "Concluir candidatura", "Enviar"];
 
     let clickedAny = false;
