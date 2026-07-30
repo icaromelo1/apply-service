@@ -69,10 +69,18 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
       return { status: "needs_review", note: `botão de candidatura não encontrado (vaga encerrada?) — ${shot}` };
     }
     await applyButton.click();
-    await page.waitForLoadState("domcontentloaded");
+    await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
 
     if (/login|signin|auth/i.test(page.url())) {
       return { status: "needs_review", note: "sessão Gupy expirada — rodar npm run gupy:login de novo" };
+    }
+
+    const flowContent = page.locator("form, main:has(button), [data-testid*=apply]").first();
+    try {
+      await flowContent.waitFor({ state: "visible", timeout: 20000 });
+    } catch {
+      const shot = await saveScreenshot(page, applicationId);
+      return { status: "needs_review", note: `fluxo de candidatura não carregou — ${shot}` };
     }
 
     const extracted = await extractPerguntas(page);
