@@ -83,6 +83,22 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
       return { status: "needs_review", note: `fluxo de candidatura não carregou — ${shot}` };
     }
 
+    const dismissModal = page
+      .locator('button:has-text("Me lembrar depois"), a:has-text("Me lembrar depois")')
+      .first();
+    if (await dismissModal.isVisible().catch(() => false)) {
+      await dismissModal.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    }
+
+    const continuar = page
+      .locator('button:has-text("Continuar"), button:has-text("Avançar"), button:has-text("Próximo")')
+      .first();
+    for (let step = 0; step < 3 && (await continuar.isVisible().catch(() => false)); step++) {
+      await continuar.click();
+      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    }
+
     const extracted = await extractPerguntas(page);
     let respostas: Resposta[] = [];
     if (extracted.length > 0) {
