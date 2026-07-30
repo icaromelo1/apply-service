@@ -180,23 +180,38 @@ export async function applyGupy(applicationId: number, job: Job): Promise<ApplyO
       };
     }
 
-    const submit = page
-      .locator('button[type=submit]:has-text("Enviar"), button:has-text("Finalizar candidatura"), button:has-text("Enviar candidatura")')
-      .first();
-    if ((await submit.count()) === 0) {
-      const shot = await saveScreenshot(page, applicationId);
-      return { status: "needs_review", note: `botão de envio não encontrado — ${shot}`, answers: answersJson };
+    const confirmation = page.locator("text=/candidatura (enviada|realizada|concluída|recebida|efetuada)|boa sorte/i");
+    const submitTexts = ["Salvar e continuar", "Enviar candidatura", "Finalizar candidatura", "Concluir candidatura", "Enviar"];
+
+    let clickedAny = false;
+    for (let step = 0; step < 4; step++) {
+      if ((await confirmation.count()) > 0) break;
+
+      let clicked = false;
+      for (const text of submitTexts) {
+        const btn = page.locator(`button:has-text("${text}")`).first();
+        if (await btn.isVisible().catch(() => false)) {
+          try {
+            await btn.click({ timeout: 5000 });
+            clicked = true;
+            clickedAny = true;
+            break;
+          } catch {}
+        }
+      }
+      if (!clicked) break;
+      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
     }
 
-    await submit.click();
-    await page.waitForLoadState("networkidle").catch(() => {});
-
-    if ((await page.locator("text=/candidatura (enviada|realizada|concluída)/i").count()) > 0) {
+    if ((await confirmation.count()) > 0) {
       return { status: "applied", answers: answersJson };
     }
 
     const shot = await saveScreenshot(page, applicationId);
-    return { status: "needs_review", note: `envio sem confirmação clara — verificar — ${shot}`, answers: answersJson };
+    if (!clickedAny) {
+      return { status: "needs_review", note: `botão de envio não encontrado — ${shot}`, answers: answersJson };
+    }
+    return { status: "needs_review", note: `envio sem confirmação clara — verificar em Minhas Candidaturas — ${shot}`, answers: answersJson };
   } catch (err) {
     const shot = await saveScreenshot(page, applicationId).catch(() => "sem screenshot");
     return { status: "failed", note: `${err instanceof Error ? err.message : String(err)} — ${shot}` };
