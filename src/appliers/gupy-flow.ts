@@ -137,6 +137,19 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
     .catch(() => {});
 
   const extracted = await extractPerguntas(page);
+
+  if (extracted.length > 0) {
+    const campos = page.locator("form textarea, form input, textarea, input[type=text]");
+    const total = await campos.count();
+    let desabilitados = 0;
+    for (let i = 0; i < total; i++) {
+      if (await campos.nth(i).isDisabled().catch(() => false)) desabilitados++;
+    }
+    if (total > 0 && desabilitados === total) {
+      return { status: "applied", note: "etapa já respondida anteriormente (campos travados pela Gupy)" };
+    }
+  }
+
   let respostas: Resposta[] = [];
   if (extracted.length > 0) {
     respostas = await responderQuestionario(
