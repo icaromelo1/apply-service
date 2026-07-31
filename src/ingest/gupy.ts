@@ -27,7 +27,7 @@ const gupyResponseSchema = z.object({
 });
 
 const PAGE_SIZE = 50;
-const MAX_PAGES_PER_KEYWORD = 2;
+const MAX_PAGES_PER_KEYWORD = 12;
 
 function buildLocation(job: z.infer<typeof gupyJobSchema>): string {
   if (job.workplaceType === "remote" || job.isRemoteWork) return "Remoto";
@@ -51,10 +51,11 @@ async function fetchPage(keyword: string, offset: number) {
 }
 
 export async function ingestGupy(): Promise<Job[]> {
-  const { keywords, remoteOnly } = config.criterios;
+  const { keywords, searchKeywords, remoteOnly } = config.criterios;
+  const termos = searchKeywords?.length ? searchKeywords : keywords;
   const byId = new Map<string, Job>();
 
-  for (const keyword of keywords) {
+  for (const keyword of termos) {
     let offset = 0;
     for (let page = 0; page < MAX_PAGES_PER_KEYWORD; page++) {
       const body = await fetchPage(keyword, offset);

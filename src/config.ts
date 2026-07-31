@@ -16,6 +16,7 @@ const env = envSchema.parse(process.env);
 
 const criteriosSchema = z.object({
   keywords: z.array(z.string()),
+  searchKeywords: z.array(z.string()).optional(),
   remoteOnly: z.boolean(),
   senioridade: z.array(z.string()),
   locais: z.array(z.string()),
