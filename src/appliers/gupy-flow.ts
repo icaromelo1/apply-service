@@ -22,13 +22,38 @@ export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta
       .replace(/\s*\*\s*$/, "");
     if (!label) continue;
 
-    const opcoes = (await wrapper.locator("label .MuiFormControlLabel-label").allTextContents())
-      .map(normalize)
-      .filter(Boolean);
+    const opcoes = await extrairOpcoes(wrapper);
 
     result.push({ pergunta: { pergunta: label, opcoes: opcoes.length > 0 ? opcoes : undefined }, locator: wrapper });
   }
   return result;
+}
+
+async function extrairOpcoes(wrapper: Locator): Promise<string[]> {
+  const seletores = [
+    "label .MuiFormControlLabel-label",
+    "label:has(input[type=radio])",
+    "label:has(input[type=checkbox])",
+    "option",
+  ];
+  const vistos = new Set<string>();
+  for (const seletor of seletores) {
+    for (const texto of await wrapper.locator(seletor).allTextContents().catch(() => [])) {
+      const limpo = normalize(texto);
+      if (limpo && limpo.length < 200 && !/^selecione/i.test(limpo)) vistos.add(limpo);
+    }
+    if (vistos.size > 0) break;
+  }
+  return [...vistos];
+}
+
+function combina(alvo: string, candidato: string): boolean {
+  const a = alvo.toLowerCase();
+  const c = candidato.toLowerCase();
+  if (a === c) return true;
+  if (a.length > 3 && c.includes(a)) return true;
+  if (c.length > 3 && a.includes(c)) return true;
+  return false;
 }
 
 export async function fillAnswer(group: Locator, resposta: string): Promise<boolean> {
@@ -42,7 +67,8 @@ export async function fillAnswer(group: Locator, resposta: string): Promise<bool
   const labelCount = await labels.count();
   for (let i = 0; i < labelCount; i++) {
     const text = normalize(await labels.nth(i).textContent().catch(() => null));
-    if (parts.includes(text)) {
+    if (!text) continue;
+    if (parts.some((p) => combina(p, text))) {
       await labels.nth(i).click().catch(() => {});
       marked = true;
     }
@@ -179,5 +205,15 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
   if (!clickedAny) {
     return { status: "needs_review", note: `botão de envio não encontrado — ${shot}`, answers: answersJson };
   }
+
+  const obrigatorios = await page.locator("text=/campo obrigat[óo]rio/i").count();
+  if (obrigatorios > 0) {
+    return {
+      status: "needs_review",
+      note: `envio recusado: ${obrigatorios} campo(s) obrigatório(s) não preenchido(s) — o form usa opções que não casaram — ${shot}`,
+      answers: answersJson,
+    };
+  }
+
   return { status: "needs_review", note: `envio sem confirmação clara — verificar em Minhas Candidaturas — ${shot}`, answers: answersJson };
 }

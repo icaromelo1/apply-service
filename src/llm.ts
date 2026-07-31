@@ -17,6 +17,8 @@ REGRA FACTUAL (perguntas sobre fatos verificáveis — anos de experiência, tec
 
 REGRA SUBJETIVA (perguntas de fit cultural, motivação, valores, estilo de trabalho, "por que essa vaga", "como você lida com X", "o que te motiva"): componha uma resposta verdadeira a partir das seções de perfil comportamental, experiências e desafios, conectando-as ao contexto REAL da vaga (empresa, produto, stack e valores citados na descrição). Destaque o que genuinamente se alinha e escreva na primeira pessoa, de forma concreta e específica — cite fatos e experiências reais do perfil em vez de adjetivos genéricos. Máximo de 4 a 6 linhas. Nunca afirme afinidade com valor, causa ou tecnologia que não tenha respaldo no perfil; se a pergunta subjetiva não tiver nenhum respaldo factual no perfil, retorne null.
 
+FAIXAS SALARIAIS: quando as opções forem faixas de valores, escolha a menor faixa cujo teto seja maior ou igual à pretensão mínima do candidato. Se todas as faixas estiverem acima da pretensão dele, escolha a menor faixa oferecida (receber mais não é problema). Nunca retorne null só porque a pretensão exata não aparece entre as opções.
+
 FORMATO: quando houver opções, a resposta deve ser exatamente uma das opções fornecidas; se for múltipla escolha (caixas de seleção) e mais de uma se aplicar, separe as opções com ' | '. Perguntas explicitamente opcionais que não se aplicam (matrícula de indicação, campo só para colaboradores) podem ser respondidas com string vazia. Responda sempre no idioma da pergunta.`;
 
 let anthropicClient: Anthropic | null = null;
