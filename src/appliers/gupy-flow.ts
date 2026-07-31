@@ -16,7 +16,8 @@ export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta
 
   for (let i = 0; i < count; i++) {
     const heading = headings.nth(i);
-    const wrapper = heading.locator("xpath=ancestor::div[2]");
+    const irmao = heading.locator("xpath=following-sibling::*[1]");
+    const wrapper = (await irmao.count()) > 0 ? irmao : heading.locator("xpath=ancestor::div[2]");
     const label = normalize(await heading.textContent().catch(() => null))
       .replace(/^\d+\s*\.\s*/, "")
       .replace(/\s*\*\s*$/, "");
