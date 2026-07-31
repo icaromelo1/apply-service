@@ -147,10 +147,27 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
   const answersJson = JSON.stringify(respostas, null, 2);
   const semResposta = respostas.filter((r) => r.resposta === null);
 
+  const naoPreenchidas: string[] = [];
   for (const [i, resposta] of respostas.entries()) {
     const target = extracted[i];
     if (!target || resposta.resposta === null) continue;
-    await fillAnswer(target.locator, resposta.resposta).catch(() => {});
+    const ok = await fillAnswer(target.locator, resposta.resposta).catch(() => false);
+    if (!ok) {
+      naoPreenchidas.push(
+        `"${resposta.pergunta.slice(0, 60)}" (resposta gerada: "${resposta.resposta.slice(0, 60)}"; opções: ${
+          target.pergunta.opcoes?.slice(0, 4).join(" / ").slice(0, 120) ?? "nenhuma detectada"
+        })`,
+      );
+    }
+  }
+
+  if (naoPreenchidas.length > 0) {
+    const shot = await saveScreenshot(page, applicationId);
+    return {
+      status: "needs_review",
+      note: `${naoPreenchidas.length} campo(s) não preenchido(s) — ${naoPreenchidas.join(" | ").slice(0, 500)} — ${shot}`,
+      answers: answersJson,
+    };
   }
 
   if (semResposta.length > 0) {
