@@ -8,7 +8,13 @@ import type { Job } from "../types.js";
 import { getBrowser, saveScreenshot } from "./browser.js";
 import { avancarIntro, dismissarModais, normalize, responderEEnviar } from "./gupy-flow.js";
 
-const ETAPA_HUMANA = /test|avalia|entrevista|interview|video|v[íi]deo|bate-papo|case|desafio|oferta/i;
+const ETAPA_RESPONDIVEL = /curricul|question|formul|cadastr|dados|fit cultural|mapeamento comportamental|perfil \(pda\)|alinhamento de expectativas|prefer[êe]ncia/i;
+const ETAPA_HUMANA = /test|avalia|entrevista|interview|v[íi]deo|video|bate.?papo|case|desafio|oferta|proposta|admiss|integra/i;
+
+function exigeHumano(texto: string): boolean {
+  if (ETAPA_RESPONDIVEL.test(texto)) return false;
+  return ETAPA_HUMANA.test(texto);
+}
 
 export interface EtapasResult {
   avancadas: number;
@@ -102,7 +108,7 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
         const url = page.url();
         const slug = url.includes("/steps/") ? (url.split("/steps/")[1]?.split("/")[1] ?? "") : "";
 
-        if (ETAPA_HUMANA.test(slug) || ETAPA_HUMANA.test(normalize(await page.textContent("h1, h2").catch(() => "")))) {
+        if (exigeHumano(slug) || exigeHumano(normalize(await page.textContent("h1, h2").catch(() => "")))) {
           const shot = await saveScreenshot(page, 0);
           anotarPorTitulo(titulo, `etapa exige você (${slug || "teste/entrevista"}) — ${shot}`);
           result.aguardandoHumano++;

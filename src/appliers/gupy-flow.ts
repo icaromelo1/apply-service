@@ -17,7 +17,10 @@ export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta
   for (let i = 0; i < count; i++) {
     const heading = headings.nth(i);
     const irmao = heading.locator("xpath=following-sibling::*[1]");
-    const wrapper = (await irmao.count()) > 0 ? irmao : heading.locator("xpath=ancestor::div[2]");
+    const temCampo =
+      (await irmao.count()) > 0 &&
+      (await irmao.locator("textarea, input, select, label").count().catch(() => 0)) > 0;
+    const wrapper = temCampo ? irmao : heading.locator("xpath=ancestor::div[1]");
     const label = normalize(await heading.textContent().catch(() => null))
       .replace(/^\d+\s*\.\s*/, "")
       .replace(/\s*\*\s*$/, "");
@@ -164,7 +167,8 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
   const naoPreenchidas: string[] = [];
   for (const [i, resposta] of respostas.entries()) {
     const target = extracted[i];
-    if (!target || resposta.resposta === null) continue;
+    const vazia = resposta.resposta === null || /^(null|undefined|n\/a)$/i.test(resposta.resposta.trim());
+    if (!target || vazia) continue;
     const ok = await fillAnswer(target.locator, resposta.resposta).catch(() => false);
     if (!ok) {
       naoPreenchidas.push(
