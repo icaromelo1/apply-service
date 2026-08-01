@@ -162,17 +162,18 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
   }
 
   const answersJson = JSON.stringify(respostas, null, 2);
-  const semResposta = respostas.filter((r) => r.resposta === null);
+  const ehVazia = (r: string | null): boolean => r === null || /^(null|undefined|n\/a)$/i.test(r.trim());
+  const semResposta = respostas.filter((r) => ehVazia(r.resposta));
 
   const naoPreenchidas: string[] = [];
   for (const [i, resposta] of respostas.entries()) {
     const target = extracted[i];
-    const vazia = resposta.resposta === null || /^(null|undefined|n\/a)$/i.test(resposta.resposta.trim());
-    if (!target || vazia) continue;
-    const ok = await fillAnswer(target.locator, resposta.resposta).catch(() => false);
+    const valor = resposta.resposta;
+    if (!target || valor === null || ehVazia(valor)) continue;
+    const ok = await fillAnswer(target.locator, valor).catch(() => false);
     if (!ok) {
       naoPreenchidas.push(
-        `"${resposta.pergunta.slice(0, 60)}" (resposta gerada: "${resposta.resposta.slice(0, 60)}"; opções: ${
+        `"${resposta.pergunta.slice(0, 60)}" (resposta gerada: "${valor.slice(0, 60)}"; opções: ${
           target.pergunta.opcoes?.slice(0, 4).join(" / ").slice(0, 120) ?? "nenhuma detectada"
         })`,
       );
