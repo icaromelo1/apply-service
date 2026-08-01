@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI, Type } from "@google/genai";
+import { agyAvailable, agyPrompt, extrairJson } from "./llm-agy.js";
 import { z } from "zod";
 import { config } from "./config.js";
 import type { Job } from "./types.js";
@@ -25,7 +26,7 @@ let anthropicClient: Anthropic | null = null;
 let geminiClient: GoogleGenAI | null = null;
 
 export function llmAvailable(): boolean {
-  return Boolean(config.geminiApiKey || config.anthropicApiKey);
+  return agyAvailable() || Boolean(config.geminiApiKey || config.anthropicApiKey);
 }
 
 function loadPerfil(): string {
@@ -92,6 +93,10 @@ function extractAnthropicText(response: Anthropic.Beta.BetaMessage): string {
 export async function gerarCoverLetter(job: Job): Promise<string> {
   const userContent = `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}`;
 
+  if (agyAvailable()) {
+    return (await agyPrompt(COVER_LETTER_SYSTEM, userContent)).trim();
+  }
+
   if (config.geminiApiKey) {
     const response = await getGemini().models.generateContent({
       model: config.geminiModel,
@@ -121,6 +126,12 @@ export async function gerarCoverLetter(job: Job): Promise<string> {
 
 export async function responderQuestionario(job: Job, perguntas: Pergunta[]): Promise<Resposta[]> {
   const userContent = `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}\n\nPerguntas do questionário:\n${perguntasTexto(perguntas)}`;
+
+  if (agyAvailable()) {
+    const formato = `\n\nResponda APENAS com JSON válido, sem markdown e sem cercas de código, no formato: {"respostas":[{"pergunta":"texto exato da pergunta","resposta":"sua resposta ou null"}]}`;
+    const saida = await agyPrompt(QUESTIONARIO_SYSTEM + formato, userContent);
+    return respostasSchema.parse(JSON.parse(extrairJson(saida))).respostas;
+  }
 
   if (config.geminiApiKey) {
     const response = await getGemini().models.generateContent({

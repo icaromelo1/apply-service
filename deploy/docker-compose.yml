@@ -42,6 +42,8 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-}
+      AGY_BIN: ${AGY_BIN:-/usr/local/bin/agy}
+      AGY_MODEL: ${AGY_MODEL:-Gemini 3.6 Flash (Low)}
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
       REVIEW_PASSWORD: ${REVIEW_PASSWORD:-}
       GUPY_AUTO_SUBMIT: ${GUPY_AUTO_SUBMIT:-false}
@@ -50,6 +52,8 @@ services:
     volumes:
       - ../apply-service/profile:/app/profile
       - apply-data:/app/data
+      - ${HOME}/.local/bin/agy:/usr/local/bin/agy:ro
+      - ${HOME}/.gemini:/root/.gemini
     networks:
       - apply-net
       - web
