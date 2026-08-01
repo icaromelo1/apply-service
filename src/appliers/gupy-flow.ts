@@ -11,23 +11,25 @@ export function normalize(s: string | null | undefined): string {
 
 export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta; locator: Locator }[]> {
   const result: { pergunta: Pergunta; locator: Locator }[] = [];
-  const headings = page.locator("h3").filter({ hasText: /^\s*\d+\s*\./ });
-  const count = await headings.count();
+  const vistos = new Set<string>();
 
+  const enunciados = page
+    .locator("h3, fieldset > label, .form-group > label, legend")
+    .filter({ hasText: /^\s*\d+\s*[.)]/ });
+
+  const count = await enunciados.count();
   for (let i = 0; i < count; i++) {
-    const heading = headings.nth(i);
-    const irmao = heading.locator("xpath=following-sibling::*[1]");
-    const temCampo =
-      (await irmao.count()) > 0 &&
-      (await irmao.locator("textarea, input, select, label").count().catch(() => 0)) > 0;
-    const wrapper = temCampo ? irmao : heading.locator("xpath=ancestor::div[1]");
-    const label = normalize(await heading.textContent().catch(() => null))
-      .replace(/^\d+\s*\.\s*/, "")
+    const enunciado = enunciados.nth(i);
+    const label = normalize(await enunciado.textContent().catch(() => null))
+      .replace(/^\d+\s*[.)]\s*/, "")
       .replace(/\s*\*\s*$/, "");
-    if (!label) continue;
+    if (!label || vistos.has(label)) continue;
+    vistos.add(label);
+
+    const proximo = enunciado.locator("xpath=ancestor::*[.//input or .//textarea or .//select][1]");
+    const wrapper = (await proximo.count().catch(() => 0)) > 0 ? proximo : enunciado.locator("xpath=..");
 
     const opcoes = await extrairOpcoes(wrapper);
-
     result.push({ pergunta: { pergunta: label, opcoes: opcoes.length > 0 ? opcoes : undefined }, locator: wrapper });
   }
   return result;
@@ -36,6 +38,7 @@ export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta
 async function extrairOpcoes(wrapper: Locator): Promise<string[]> {
   const seletores = [
     "label .MuiFormControlLabel-label",
+    "label.radio-button, label.checkbox-button",
     "label:has(input[type=radio])",
     "label:has(input[type=checkbox])",
     "option",
