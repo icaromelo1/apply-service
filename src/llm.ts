@@ -20,7 +20,9 @@ REGRA SUBJETIVA (perguntas de fit cultural, motivação, valores, estilo de trab
 
 FAIXAS SALARIAIS: quando as opções forem faixas de valores, escolha a menor faixa cujo teto seja maior ou igual à pretensão mínima do candidato. Se todas as faixas estiverem acima da pretensão dele, escolha a menor faixa oferecida (receber mais não é problema). Nunca retorne null só porque a pretensão exata não aparece entre as opções.
 
-FORMATO: quando houver opções, a resposta deve ser exatamente uma das opções fornecidas; se for múltipla escolha (caixas de seleção) e mais de uma se aplicar, separe as opções com ' | '. Perguntas explicitamente opcionais que não se aplicam (matrícula de indicação, campo só para colaboradores) podem ser respondidas com string vazia. Responda sempre no idioma da pergunta.`;
+PERGUNTAS CONDICIONAIS QUE NÃO SE APLICAM: muitos formulários trazem perguntas do tipo "em caso positivo, qual...", "se sim, detalhe...", "caso seja colaborador, informe a matrícula", e as marcam como obrigatórias mesmo quando a condição não vale para o candidato. Nesses casos NUNCA retorne null nem string vazia — responda exatamente "Não se aplica". Isso não é inventar informação: é declarar que a condição não ocorre. A mesma regra vale para campos obrigatórios de detalhamento cuja pergunta-mãe foi respondida com "Não".
+
+FORMATO: quando houver opções, a resposta deve ser exatamente uma das opções fornecidas; se for múltipla escolha (caixas de seleção) e mais de uma se aplicar, separe as opções com ' | '. Responda sempre no idioma da pergunta.`;
 
 let anthropicClient: Anthropic | null = null;
 let geminiClient: GoogleGenAI | null = null;
