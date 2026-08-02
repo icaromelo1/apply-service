@@ -194,9 +194,10 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
 
   if (semResposta.length > 0) {
     const shot = await saveScreenshot(page, applicationId);
+    const faltando = semResposta.map((r) => `"${r.pergunta.slice(0, 90)}"`).join(" | ");
     return {
       status: "needs_review",
-      note: `${semResposta.length} pergunta(s) sem resposta no perfil — completar e enviar manualmente — ${shot}`,
+      note: `DADO FALTANDO NO PERFIL (${semResposta.length}): ${faltando} — ${shot}`,
       answers: answersJson,
     };
   }
