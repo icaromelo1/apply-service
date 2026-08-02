@@ -66,6 +66,10 @@ services:
       - traefik.http.routers.apply.rule=Host(`apply.icaromelodev.com.br`)
       - traefik.http.routers.apply.entrypoints=websecure
       - traefik.http.routers.apply.tls.certresolver=le
+      - traefik.http.routers.apply.middlewares=apply-hsts
+      - traefik.http.middlewares.apply-hsts.headers.forceSTSHeader=true
+      - traefik.http.middlewares.apply-hsts.headers.stsSeconds=31536000
+      - traefik.http.middlewares.apply-hsts.headers.stsPreload=true
       - traefik.http.services.apply.loadbalancer.server.port=8090
       - traefik.docker.network=web
 
