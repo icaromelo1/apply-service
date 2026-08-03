@@ -14,7 +14,12 @@ export function adquirirTrava(nome: string): boolean {
 
   if (existsSync(arquivo)) {
     const quando = Number(readFileSync(arquivo, "utf8").split("|")[1] ?? 0);
-    if (Date.now() - quando < VALIDADE_MS) return false;
+    const idadeMin = Math.round((Date.now() - quando) / 60000);
+    if (Date.now() - quando < VALIDADE_MS) {
+      console.error(`[trava] ${nome} tomada há ${idadeMin} min (expira em ${VALIDADE_MS / 60000} min)`);
+      return false;
+    }
+    console.warn(`[trava] ${nome} estava órfã há ${idadeMin} min — assumindo`);
   }
 
   writeFileSync(arquivo, `${process.pid}|${Date.now()}`);
