@@ -91,6 +91,11 @@ export async function coletarCampos(page: Page): Promise<Campo[]> {
       tipo: temSelect ? "select" : "texto",
       opcoes: temSelect ? await opcoesDoSelect(page, wrapper) : [],
     });
+
+    const ultimo = campos[campos.length - 1];
+    if (ultimo && ultimo.tipo === "select" && ultimo.opcoes.length === 0 && temTexto) {
+      ultimo.tipo = "texto";
+    }
   }
   return campos;
 }
@@ -149,7 +154,29 @@ async function preencherSelect(
 
     await page.keyboard.press("Escape");
   } catch {}
-  return false;
+
+  return await digitarEConfirmar(page, wrapper, escolhido);
+}
+
+async function digitarEConfirmar(page: Page, wrapper: Locator, valor: string): Promise<boolean> {
+  const texto = wrapper.locator("input[type=text], input:not([type]), textarea").first();
+  if ((await texto.count()) === 0) return false;
+
+  try {
+    await texto.fill(valor);
+    await page.waitForTimeout(700);
+
+    const sugestao = page.locator("[role=option], [role=listbox] li").first();
+    if (await sugestao.isVisible().catch(() => false)) {
+      await sugestao.click();
+      await page.waitForTimeout(300);
+      return true;
+    }
+
+    return normalize(await texto.inputValue().catch(() => "")).length > 0;
+  } catch {
+    return false;
+  }
 }
 
 function escapeRegex(texto: string): string {
