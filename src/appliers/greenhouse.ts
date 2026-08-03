@@ -165,14 +165,50 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
     }
 
     await submit.click();
-    await page.waitForLoadState("networkidle").catch(() => {});
 
     const confirmation = page.locator('text=/thank you|application.*(submitted|received)|obrigado/i');
-    if ((await confirmation.count()) > 0) {
-      return { status: "applied", aderencia: cv.score?.cobertura, cvPath: cv.sobMedida ? cv.caminho : undefined };
+    const erros = page.locator('.error, [class*="error"]:visible, [role="alert"]');
+
+    const LIMITE_MS = 60000;
+    const inicio = Date.now();
+    let confirmado = false;
+    let mensagemErro = "";
+
+    while (Date.now() - inicio < LIMITE_MS) {
+      if ((await confirmation.count().catch(() => 0)) > 0) {
+        confirmado = true;
+        break;
+      }
+
+      const textoErro = (await erros.allTextContents().catch(() => []))
+        .map((t) => t.trim())
+        .filter((t) => t.length > 3 && t.length < 200);
+      if (textoErro.length > 0) {
+        mensagemErro = [...new Set(textoErro)].join(" | ").slice(0, 220);
+        break;
+      }
+
+      const enviando = await submit.isDisabled().catch(() => false);
+      const aindaNoForm = (await submit.count().catch(() => 0)) > 0;
+      if (!enviando && !aindaNoForm) break;
+
+      await page.waitForTimeout(2000);
+    }
+
+    if (confirmado) {
+      const prova = await saveScreenshot(page, applicationId);
+      return {
+        status: "applied",
+        note: `confirmada — evidência: ${prova}`,
+        aderencia: cv.score?.cobertura,
+        cvPath: cv.sobMedida ? cv.caminho : undefined,
+      };
     }
 
     const shot = await saveScreenshot(page, applicationId);
+    if (mensagemErro) {
+      return { status: "needs_review", note: `form recusou o envio: ${mensagemErro} — ${shot}` };
+    }
     return { status: "needs_review", note: `submit sem confirmação clara — verificar — ${shot}` };
   } catch (err) {
     const shot = await saveScreenshot(page, applicationId).catch(() => "sem screenshot");
