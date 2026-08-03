@@ -44,6 +44,15 @@ export async function situacaoVaga(job: Job): Promise<SituacaoVaga> {
   }
 }
 
+async function confirmacaoVisivel(page: Page): Promise<boolean> {
+  return (
+    (await page
+      .locator('text=/thank you|application.*(submitted|received)|obrigado/i')
+      .count()
+      .catch(() => 0)) > 0
+  );
+}
+
 async function resolverCodigo(page: Page, submit: import("playwright").Locator): Promise<boolean> {
   if (!leituraDeEmailDisponivel()) return false;
 
@@ -204,7 +213,17 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
     await submit.click();
 
     const verificacao = page.locator('text=/verification code|c[óo]digo de verifica[çc][ãa]o/i').first();
-    if (await verificacao.isVisible().catch(() => false)) {
+    let exigeCodigo = false;
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(2000);
+      if (await verificacao.isVisible().catch(() => false)) {
+        exigeCodigo = true;
+        break;
+      }
+      if ((await confirmacaoVisivel(page)) || (await submit.count().catch(() => 0)) === 0) break;
+    }
+
+    if (exigeCodigo) {
       const resolvido = await resolverCodigo(page, submit);
       if (!resolvido) {
         const shot = await saveScreenshot(page, applicationId);
