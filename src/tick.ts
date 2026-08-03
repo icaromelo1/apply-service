@@ -46,7 +46,9 @@ async function main(): Promise<void> {
 
   try {
     const digested = await runDigest();
-    console.log(`[digest] ${digested} vagas no digest`);
+    console.log(
+      `[digest] ${digested.enviadas} enviadas · ${digested.descartadasPorScore} descartadas por score · ${digested.expiradas} expiradas`,
+    );
   } catch (err) {
     console.error("[digest] falhou:", err instanceof Error ? err.message : err);
   }

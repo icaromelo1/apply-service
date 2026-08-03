@@ -23,6 +23,8 @@ const criteriosSchema = z.object({
   tetoDiario: z.number(),
   cooldownEmpresaDias: z.number(),
   minScore: z.number(),
+  digestMinScore: z.number().optional(),
+  digestValidadeDias: z.number().optional(),
 });
 
 export type Criterios = z.infer<typeof criteriosSchema>;

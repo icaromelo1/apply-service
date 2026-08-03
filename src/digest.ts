@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { config } from "./config.js";
 import { db } from "./db/index.js";
 import { applications, jobs } from "./db/schema.js";
@@ -36,7 +36,41 @@ function rowToJob(row: typeof jobs.$inferSelect): Job {
   };
 }
 
-export async function runDigest(): Promise<number> {
+export interface DigestResult {
+  enviadas: number;
+  descartadasPorScore: number;
+  expiradas: number;
+}
+
+export async function runDigest(): Promise<DigestResult> {
+  const minScore = config.criterios.digestMinScore ?? config.criterios.minScore + 1;
+  const validadeDias = config.criterios.digestValidadeDias ?? 7;
+  const corte = new Date(Date.now() - validadeDias * 86_400_000).toISOString().slice(0, 19).replace("T", " ");
+
+  const expiradas = db
+    .update(applications)
+    .set({ status: "skipped", reviewNote: `digest expirado (>${validadeDias} dias sem aplicar)`, updatedAt: sql`CURRENT_TIMESTAMP` })
+    .where(
+      and(
+        eq(applications.method, "digest"),
+        inArray(applications.status, ["queued", "needs_review"]),
+        lt(applications.createdAt, corte),
+      ),
+    )
+    .run().changes;
+
+  const baixoScore = db
+    .update(applications)
+    .set({ status: "skipped", reviewNote: `abaixo do score mínimo do digest (${minScore})`, updatedAt: sql`CURRENT_TIMESTAMP` })
+    .where(
+      and(
+        eq(applications.method, "digest"),
+        inArray(applications.status, ["queued", "needs_review"]),
+        lt(applications.score, minScore),
+      ),
+    )
+    .run().changes;
+
   const pending = db
     .select({ application: applications, job: jobs })
     .from(applications)
@@ -44,7 +78,7 @@ export async function runDigest(): Promise<number> {
     .where(and(eq(applications.method, "digest"), eq(applications.status, "queued")))
     .all();
 
-  if (pending.length === 0) return 0;
+  if (pending.length === 0) return { enviadas: 0, descartadasPorScore: baixoScore, expiradas };
 
   await postDiscord(`**Digest de vagas — ${pending.length} para aplicar manualmente**`);
 
@@ -69,5 +103,5 @@ export async function runDigest(): Promise<number> {
       .run();
   }
 
-  return pending.length;
+  return { enviadas: pending.length, descartadasPorScore: baixoScore, expiradas };
 }
