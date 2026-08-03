@@ -51,7 +51,9 @@ function emCooldown(visitas: Record<string, string>, link: string): boolean {
   return Date.now() - new Date(quando).getTime() < HORAS_ESPERA * 60 * 60 * 1000;
 }
 
-function anotarPorTitulo(titulo: string, nota: string, etapa?: string): void {
+type StatusApp = "queued" | "needs_review" | "applied" | "skipped" | "failed";
+
+function anotarPorTitulo(titulo: string, nota: string, etapa?: string, status?: StatusApp): void {
   const rows = db
     .select({ id: applications.id, title: jobs.title })
     .from(applications)
@@ -63,7 +65,12 @@ function anotarPorTitulo(titulo: string, nota: string, etapa?: string): void {
   if (!alvo) return;
 
   db.update(applications)
-    .set({ reviewNote: nota, ...(etapa ? { etapa } : {}), updatedAt: sql`CURRENT_TIMESTAMP` })
+    .set({
+      reviewNote: nota,
+      ...(etapa ? { etapa } : {}),
+      ...(status ? { status } : {}),
+      updatedAt: sql`CURRENT_TIMESTAMP`,
+    })
     .where(sql`${applications.id} = ${alvo.id}`)
     .run();
 }
@@ -170,6 +177,7 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
           titulo,
           `etapa ${slug || "questionário"}: ${outcome.status} — ${outcome.note ?? ""}`,
           outcome.status === "applied" ? `avançou: ${slug || "questionário"}` : `travou: ${slug || "questionário"}`,
+          outcome.status === "applied" ? "applied" : outcome.status === "skipped" ? "skipped" : "needs_review",
         );
 
         if (outcome.status === "applied") result.avancadas++;
