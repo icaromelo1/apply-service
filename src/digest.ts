@@ -67,6 +67,7 @@ export async function runDigest(): Promise<DigestResult> {
         eq(applications.method, "digest"),
         inArray(applications.status, ["queued", "needs_review"]),
         lt(applications.score, minScore),
+        sql`coalesce(${applications.reviewNote}, '') not like '%site de carreira próprio%'`,
       ),
     )
     .run().changes;
