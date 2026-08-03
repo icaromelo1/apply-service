@@ -1,7 +1,7 @@
 import type { Locator, Page } from "playwright";
 import { llmAvailable, responderQuestionario, type Pergunta } from "../llm.js";
 import type { Job } from "../types.js";
-import { ehDadoSensivel, normalize } from "./gupy-flow.js";
+import { combina, ehDadoSensivel, normalize } from "./gupy-flow.js";
 
 const IGNORAR = /first name|last name|email|phone|resume|cover letter|linkedin profile|website|^attach|upload|curr[íi]culo|drag and drop|arraste/i;
 
@@ -72,11 +72,29 @@ export async function coletarCampos(page: Page): Promise<Campo[]> {
   return campos;
 }
 
-async function preencherSelect(page: Page, wrapper: Locator, valor: string): Promise<boolean> {
+function melhorOpcao(valor: string, opcoes: string[]): string | null {
+  if (opcoes.length === 0) return null;
+  const exata = opcoes.find((o) => o.toLowerCase() === valor.toLowerCase());
+  if (exata) return exata;
+
+  const candidatas = opcoes.filter((o) => combina(valor, o));
+  if (candidatas.length === 0) return null;
+
+  return candidatas.reduce((menor, atual) => (atual.length < menor.length ? atual : menor));
+}
+
+async function preencherSelect(
+  page: Page,
+  wrapper: Locator,
+  valor: string,
+  opcoes: string[] = [],
+): Promise<boolean> {
+  const escolhido = melhorOpcao(valor, opcoes) ?? valor;
+
   const nativo = wrapper.locator("select");
   if ((await nativo.count()) > 0) {
     try {
-      await nativo.selectOption({ label: valor });
+      await nativo.selectOption({ label: escolhido });
       return true;
     } catch {
       return false;
@@ -87,7 +105,7 @@ async function preencherSelect(page: Page, wrapper: Locator, valor: string): Pro
   try {
     await shell.click({ timeout: 4000 });
     await page.waitForTimeout(400);
-    const opcao = page.locator("[role=option]").filter({ hasText: valor }).first();
+    const opcao = page.locator("[role=option]").filter({ hasText: escolhido }).first();
     if (await opcao.isVisible().catch(() => false)) {
       await opcao.click();
       return true;
@@ -112,7 +130,7 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
   const eeo = campos.filter((c) => EEO.test(c.rotulo));
   for (const campo of eeo) {
     const declinar = opcaoDeclinar(campo.opcoes);
-    if (declinar) await preencherSelect(page, campo.wrapper, declinar).catch(() => false);
+    if (declinar) await preencherSelect(page, campo.wrapper, declinar, campo.opcoes).catch(() => false);
   }
 
   const restantes = campos.filter((c) => !EEO.test(c.rotulo));
@@ -143,7 +161,7 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
 
     const ok =
       campo.tipo === "select"
-        ? await preencherSelect(page, campo.wrapper, valor)
+        ? await preencherSelect(page, campo.wrapper, valor, campo.opcoes)
         : await campo.wrapper
             .locator("input[type=text], textarea")
             .first()

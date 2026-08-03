@@ -75,7 +75,7 @@ function prefixo(s: string): string {
   return s.split(/\s*[-–—:(]/)[0]!.trim().toLowerCase();
 }
 
-function combina(alvo: string, candidato: string): boolean {
+export function combina(alvo: string, candidato: string): boolean {
   const a = alvo.toLowerCase();
   const c = candidato.toLowerCase();
   if (a === c) return true;
