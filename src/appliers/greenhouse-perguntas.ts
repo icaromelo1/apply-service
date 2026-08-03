@@ -26,20 +26,33 @@ interface Campo {
   opcoes: string[];
 }
 
+function controle(wrapper: Locator): Locator {
+  return wrapper.locator(".select__control, [class*='-control']").first();
+}
+
+function entrada(wrapper: Locator): Locator {
+  return wrapper.locator(".select__input-container input, input[id^='react-select']").first();
+}
+
+async function abrirMenu(page: Page, wrapper: Locator): Promise<boolean> {
+  const ctrl = controle(wrapper);
+  if ((await ctrl.count()) === 0) return false;
+  await ctrl.click({ timeout: 4000 });
+  await page.waitForTimeout(500);
+  return (await page.locator("[role=option]").count()) > 0;
+}
+
 async function opcoesDoSelect(page: Page, wrapper: Locator): Promise<string[]> {
   const nativo = wrapper.locator("select");
   if ((await nativo.count()) > 0) {
     return (await nativo.locator("option").allTextContents()).map(normalize).filter((o) => o && !/^select/i.test(o));
   }
 
-  const shell = wrapper.locator(".select-shell, [class*='-container']").first();
-  if ((await shell.count()) === 0) return [];
-
   try {
-    await shell.click({ timeout: 4000 });
-    await page.waitForTimeout(400);
+    if (!(await abrirMenu(page, wrapper))) return [];
     const opcoes = (await page.locator("[role=option]").allTextContents()).map(normalize).filter(Boolean);
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
     return opcoes;
   } catch {
     return [];
@@ -101,18 +114,43 @@ async function preencherSelect(
     }
   }
 
-  const shell = wrapper.locator(".select-shell, [class*='-container']").first();
   try {
-    await shell.click({ timeout: 4000 });
-    await page.waitForTimeout(400);
-    const opcao = page.locator("[role=option]").filter({ hasText: escolhido }).first();
-    if (await opcao.isVisible().catch(() => false)) {
-      await opcao.click();
-      return true;
+    if (!(await abrirMenu(page, wrapper))) return false;
+
+    const exata = page.locator("[role=option]").filter({ hasText: new RegExp(`^\\s*${escapeRegex(escolhido)}\\s*$`, "i") }).first();
+    if (await exata.isVisible().catch(() => false)) {
+      await exata.click();
+      await page.waitForTimeout(300);
+      return await confirmado(wrapper, escolhido);
     }
+
+    const campo = entrada(wrapper);
+    if ((await campo.count()) > 0) {
+      await campo.fill(escolhido).catch(() => {});
+      await page.waitForTimeout(600);
+      const primeira = page.locator("[role=option]").first();
+      if (await primeira.isVisible().catch(() => false)) {
+        await primeira.click();
+        await page.waitForTimeout(300);
+        return await confirmado(wrapper, escolhido);
+      }
+    }
+
     await page.keyboard.press("Escape");
   } catch {}
   return false;
+}
+
+function escapeRegex(texto: string): string {
+  return texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function confirmado(wrapper: Locator, valor: string): Promise<boolean> {
+  const escolhido = normalize(
+    await wrapper.locator(".select__single-value, [class*='-singleValue']").first().textContent().catch(() => null),
+  );
+  if (!escolhido) return false;
+  return combina(valor, escolhido) || escolhido.toLowerCase() === valor.toLowerCase();
 }
 
 export interface ResultadoPerguntas {

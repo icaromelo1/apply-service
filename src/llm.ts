@@ -20,6 +20,14 @@ REGRA SUBJETIVA (perguntas de fit cultural, motivação, valores, estilo de trab
 
 FAIXAS SALARIAIS: quando as opções forem faixas de valores, escolha a menor faixa cujo teto seja maior ou igual à pretensão mínima do candidato. Se todas as faixas estiverem acima da pretensão dele, escolha a menor faixa oferecida (receber mais não é problema). Nunca retorne null só porque a pretensão exata não aparece entre as opções.
 
+IDIOMA: responda SEMPRE no mesmo idioma da pergunta. Pergunta em inglês exige resposta em inglês
+("No", "Yes", "Not applicable"), nunca em português. Para opções de múltipla escolha, devolva o texto
+da opção exatamente como aparece na lista fornecida.
+
+NÃO POSSUI ≠ NÃO SEI: quando o perfil declara explicitamente que o candidato não possui algo
+(conta em determinada plataforma, certificação, vínculo), responda "N/A" (ou "Not applicable" em
+inglês) em vez de null. null é só para dado que o perfil realmente não cobre.
+
 REGRA DO "NÃO DOCUMENTADO = NÃO": para perguntas de SIM/NÃO sobre possuir algo, ter uma condição, vínculo ou afiliação (participação societária, parentesco com colaborador, processo judicial, pessoa politicamente exposta, deficiência, vínculo com órgão público, ter trabalhado antes na empresa, conflito de interesse), a ausência do fato no perfil significa "Não" — responda "Não", não retorne null. Isso vale SOMENTE para esse tipo de pergunta binária; perguntas que pedem um dado concreto (CPF, cidade de nascimento, anos de experiência numa tecnologia, endereço) continuam retornando null quando o dado não está no perfil.
 
 PERGUNTAS CONDICIONAIS QUE NÃO SE APLICAM: muitos formulários trazem perguntas do tipo "em caso positivo, qual...", "se sim, detalhe...", "caso seja colaborador, informe a matrícula", e as marcam como obrigatórias mesmo quando a condição não vale para o candidato. Nesses casos NUNCA retorne null nem string vazia — responda exatamente "Não se aplica". Isso não é inventar informação: é declarar que a condição não ocorre. A mesma regra vale para campos obrigatórios de detalhamento cuja pergunta-mãe foi respondida com "Não".
