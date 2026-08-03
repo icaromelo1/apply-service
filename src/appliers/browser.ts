@@ -29,7 +29,23 @@ export async function hasCaptcha(page: Page): Promise<boolean> {
   const captcha = page.locator(
     'iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="turnstile"], div.g-recaptcha, div.h-captcha',
   );
-  return (await captcha.count()) > 0;
+
+  const total = Math.min(await captcha.count().catch(() => 0), 6);
+
+  for (let i = 0; i < total; i++) {
+    const elemento = captcha.nth(i);
+    if (!(await elemento.isVisible().catch(() => false))) continue;
+
+    const caixa = await elemento.boundingBox().catch(() => null);
+    if (!caixa) continue;
+
+    if (caixa.width >= 240 && caixa.height >= 60) return true;
+  }
+
+  const desafio = page.locator(
+    'text=/verify you are human|sou humano|n[ãa]o sou um rob[ôo]|complete the security check/i',
+  );
+  return (await desafio.count().catch(() => 0)) > 0;
 }
 
 export interface ApplyOutcome {
