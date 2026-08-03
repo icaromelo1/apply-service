@@ -11,7 +11,14 @@ import { prune } from "./pipeline/prune.js";
 import type { Job } from "./types.js";
 
 async function main(): Promise<void> {
-  console.log(`[tick] início ${new Date().toISOString()}`);
+  const LIMITE_MS = Number(process.env.TICK_LIMITE_MIN ?? 75) * 60 * 1000;
+const watchdog = setTimeout(() => {
+  console.error(`[tick] watchdog: excedeu ${LIMITE_MS / 60000} min, encerrando`);
+  process.exit(2);
+}, LIMITE_MS);
+watchdog.unref();
+
+console.log(`[tick] início ${new Date().toISOString()}`);
 
   const jobs: Job[] = [];
 
@@ -53,6 +60,7 @@ async function main(): Promise<void> {
   } finally {
     await reportarSaude().catch((err) => console.error("[saude] falhou:", err));
 
+  clearTimeout(watchdog);
   await closeBrowser();
   }
 
