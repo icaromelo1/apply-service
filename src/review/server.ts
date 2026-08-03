@@ -188,7 +188,7 @@ function pagina(): string {
 <h1>apply-service</h1>
 <p class="resumo">${enviadas.length} enviadas · ${acao.length} precisam de ação · ${manual.length} para aplicar manualmente</p>
 ${secao("Precisam de ação", "Candidaturas travadas — falta um dado seu ou o formulário não fechou.", acao, "acao")}
-${secao("Aplique você mesmo", "Vagas de LinkedIn/Indeed. O serviço NÃO se candidata nelas — só reúne e escreve a cover letter. Clicar em “abrir vaga” leva ao anúncio; a candidatura é sua.", manual, "manual")}
+${secao("Aplique você mesmo", "Vagas de LinkedIn/Indeed e de empresas com site de carreira próprio (sem formulário automatizável). O serviço NÃO se candidata nelas — só reúne, gera o currículo e escreve a cover letter. Clicar em “abrir vaga” leva ao anúncio; a candidatura é sua.", manual, "manual")}
 ${secao("Enviadas automaticamente", "Candidaturas concluídas pelo serviço, com evidência da tela de confirmação.", enviadas, "enviada")}
 ${secao("Encerradas e falhas", "Vagas que saíram do ar ou falharam de forma definitiva.", mortas, "morta")}
 </body></html>`;
