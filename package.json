@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "gupy:login": "tsx src/appliers/gupy-login.ts",
     "review": "tsx src/review/server.ts",
-    "faltando": "tsx src/faltando.ts"
+    "faltando": "tsx src/faltando.ts",
+    "inbox": "tsx src/check-inbox.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
