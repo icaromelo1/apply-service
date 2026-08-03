@@ -54,34 +54,53 @@ async function ensureScraperUp(): Promise<void> {
 export async function ingestScraper(): Promise<Job[]> {
   await ensureScraperUp();
 
-  const { keywords, remoteOnly, locais } = config.criterios;
+  const { keywords, searchKeywords, remoteOnly, locais } = config.criterios;
+  const termos = searchKeywords && searchKeywords.length > 0 ? searchKeywords : keywords;
+  const janela = process.env.SCRAPER_TIME_FILTER ?? "r604800";
+  const paginas = Number(process.env.SCRAPER_MAX_PAGES ?? 4);
+  const alvos = locais.length > 0 ? locais : ["Brasil"];
 
-  const res = await fetch(new URL("/scrape", config.scraperUrl), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      keywords,
-      remoteOnly,
-      searchLocation: locais[0] ?? "Brasil",
-      timeFilter: "r86400",
-      resultsPerPage: 25,
-      maxPagesPerKeyword: 2,
-    }),
-    signal: AbortSignal.timeout(20 * 60 * 1000),
-  });
+  const brutos: unknown[] = [];
 
-  if (!res.ok) {
-    throw new Error(`scraper respondeu ${res.status} no /scrape`);
+  for (const local of alvos) {
+    const res = await fetch(new URL("/scrape", config.scraperUrl), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        keywords: termos,
+        remoteOnly,
+        searchLocation: local,
+        timeFilter: janela,
+        resultsPerPage: 25,
+        maxPagesPerKeyword: paginas,
+      }),
+      signal: AbortSignal.timeout(20 * 60 * 1000),
+    });
+
+    if (!res.ok) {
+      console.error(`[scraper] ${local} respondeu ${res.status}`);
+      continue;
+    }
+
+    const body = scrapeResponseSchema.parse(await res.json());
+    const achadas = body.jobs ?? [];
+    console.log(`[scraper] ${local}: ${achadas.length} vagas (janela ${janela}, ${paginas} páginas)`);
+    brutos.push(...achadas);
   }
 
-  const body = scrapeResponseSchema.parse(await res.json());
-  const jobs: Job[] = [];
+  if (brutos.length === 0) {
+    throw new Error("scraper não retornou vagas em nenhuma localização");
+  }
 
-  for (const raw of body.jobs ?? []) {
+  const jobs: Job[] = [];
+  const vistos = new Set<string>();
+
+  for (const raw of brutos) {
     const parsed = scrapeJobSchema.safeParse(raw);
     if (!parsed.success) continue;
     const j = parsed.data;
-    if (!j.id) continue;
+    if (!j.id || vistos.has(j.id)) continue;
+    vistos.add(j.id);
 
     jobs.push({
       id: j.id,
