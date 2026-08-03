@@ -80,8 +80,13 @@ export async function coletarCampos(page: Page): Promise<Campo[]> {
     if (!rotulo || rotulo.length < 4 || IGNORAR.test(rotulo)) continue;
     if (campos.some((c) => c.rotulo === rotulo)) continue;
 
-    const telefone = await wrapper.locator("input[type=tel], .PhoneInput, [class*='phone']").count().catch(() => 0);
-    if (telefone > 0) continue;
+    const dentroDeTelefone =
+      (await wrapper
+        .locator("xpath=ancestor-or-self::*[contains(@class,'phone-input') or contains(@class,'PhoneInput')]")
+        .count()
+        .catch(() => 0)) > 0;
+    const temTel = (await wrapper.locator("input[type=tel]").count().catch(() => 0)) > 0;
+    if (dentroDeTelefone || temTel) continue;
 
     const temSelect =
       (await wrapper.locator("select, .select-shell, [class*='-container']").count().catch(() => 0)) > 0;
