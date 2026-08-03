@@ -47,11 +47,15 @@ async function extrairOpcoes(wrapper: Locator): Promise<string[]> {
   for (const seletor of seletores) {
     for (const texto of await wrapper.locator(seletor).allTextContents().catch(() => [])) {
       const limpo = normalize(texto);
-      if (limpo && limpo.length < 200 && !/^selecione/i.test(limpo)) vistos.add(limpo);
+      if (limpo && limpo.length < 600 && !/^selecione/i.test(limpo)) vistos.add(limpo);
     }
     if (vistos.size > 0) break;
   }
   return [...vistos];
+}
+
+function prefixo(s: string): string {
+  return s.split(/\s*[-–—:(]/)[0]!.trim().toLowerCase();
 }
 
 function combina(alvo: string, candidato: string): boolean {
@@ -60,6 +64,11 @@ function combina(alvo: string, candidato: string): boolean {
   if (a === c) return true;
   if (a.length > 3 && c.includes(a)) return true;
   if (c.length > 3 && a.includes(c)) return true;
+
+  const pa = prefixo(alvo);
+  const pc = prefixo(candidato);
+  if (pa.length > 3 && pc.length > 3 && (pa === pc || pa.includes(pc) || pc.includes(pa))) return true;
+
   return false;
 }
 
