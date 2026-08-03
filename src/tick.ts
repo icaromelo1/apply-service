@@ -2,6 +2,7 @@ import { resolverEtapasGupy } from "./appliers/gupy-etapas.js";
 import { runAppliers } from "./appliers/index.js";
 import { closeBrowser } from "./appliers/browser.js";
 import { runDigest } from "./digest.js";
+import { reportarSaude } from "./saude.js";
 import { ingestGupy } from "./ingest/gupy.js";
 import { ingestLever } from "./ingest/lever.js";
 import { ingestScraper } from "./ingest/scraper.js";
@@ -50,7 +51,9 @@ async function main(): Promise<void> {
   } catch (err) {
     console.error("[etapas] falhou:", err instanceof Error ? err.message : err);
   } finally {
-    await closeBrowser();
+    await reportarSaude().catch((err) => console.error("[saude] falhou:", err));
+
+  await closeBrowser();
   }
 
   try {

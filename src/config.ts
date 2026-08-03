@@ -10,6 +10,7 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   GEMINI_MODEL: z.preprocess(emptyToUndefined, z.string().default("gemini-2.5-flash")),
   DISCORD_WEBHOOK_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  PAINEL_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
 });
 
 const env = envSchema.parse(process.env);
@@ -78,6 +79,7 @@ export const config = {
   geminiApiKey: env.GEMINI_API_KEY,
   geminiModel: env.GEMINI_MODEL,
   discordWebhookUrl: env.DISCORD_WEBHOOK_URL,
+  painelUrl: env.PAINEL_URL ?? "https://apply.icaromelodev.com.br",
   paths,
   criterios: loadCriterios(),
   candidato: loadCandidato(),
