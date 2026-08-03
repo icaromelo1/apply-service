@@ -5,6 +5,7 @@ import { gerarCvParaVaga } from "../cv/index.js";
 import { gerarCoverLetter } from "../llm.js";
 import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
+import { responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
 
 async function fillFirst(page: Page, selectors: string[], value: string): Promise<boolean> {
   for (const selector of selectors) {
@@ -71,14 +72,30 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
       await coverField.fill(await gerarCoverLetter(job));
     }
 
-    const customRequired = page.locator(
-      'div[class*="application"] select:not([name*="location"]), fieldset:has(input[type="radio"])',
-    );
-    if ((await customRequired.count()) > 0) {
+    const perguntas = await responderPerguntasGreenhouse(page, job);
+
+    if (perguntas.sensiveis.length > 0) {
+      return {
+        status: "skipped",
+        note: `DESCARTADA — exige dado sensível: ${perguntas.sensiveis.join(" | ")}`,
+      };
+    }
+
+    if (perguntas.semResposta.length > 0) {
       const shot = await saveScreenshot(page, applicationId);
       return {
         status: "needs_review",
-        note: `perguntas customizadas no form (${await customRequired.count()}) — revisar e enviar manualmente — ${shot}`,
+        note: `DADO FALTANDO NO PERFIL (${perguntas.semResposta.length}): ${perguntas.semResposta
+          .map((p) => `"${p.slice(0, 70)}"`)
+          .join(" | ")} — ${shot}`,
+      };
+    }
+
+    if (perguntas.naoPreenchidas.length > 0) {
+      const shot = await saveScreenshot(page, applicationId);
+      return {
+        status: "needs_review",
+        note: `${perguntas.naoPreenchidas.length} campo(s) não preenchido(s): ${perguntas.naoPreenchidas.join(" | ").slice(0, 300)} — ${shot}`,
       };
     }
 
