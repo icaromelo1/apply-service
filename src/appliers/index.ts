@@ -3,13 +3,17 @@ import { db } from "../db/index.js";
 import { applications, jobs } from "../db/schema.js";
 import type { Job } from "../types.js";
 import { closeBrowser, type ApplyOutcome } from "./browser.js";
+import { applyAshby } from "./ashby.js";
 import { applyGreenhouse } from "./greenhouse.js";
 import { applyGupy } from "./gupy.js";
 import { applyLever } from "./lever.js";
+import { applyWorkable } from "./workable.js";
 
 const APPLIERS: Record<string, (applicationId: number, job: Job) => Promise<ApplyOutcome>> = {
   greenhouse: applyGreenhouse,
   lever: applyLever,
+  ashby: applyAshby,
+  workable: applyWorkable,
   gupy: applyGupy,
 };
 

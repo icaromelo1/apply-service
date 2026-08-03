@@ -5,6 +5,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { config } from "../config.js";
 import { db } from "../db/index.js";
 import { applications, jobs } from "../db/schema.js";
+import { detectarPlataforma } from "../appliers/plataforma.js";
 
 const PORT = Number(process.env.REVIEW_PORT ?? 8090);
 const PASSWORD = process.env.REVIEW_PASSWORD;
@@ -115,7 +116,7 @@ function card(l: Linha, tipo: "acao" | "manual" | "enviada" | "morta"): string {
   return `<article>
     <h3>${esc(l.title)}</h3>
     <p class="emp">${esc(l.company)}</p>
-    <p>${selo}<span class="badge">${esc(l.source)}</span><span class="badge">score ${l.score}</span>
+    <p>${selo}<span class="badge">${esc(detectarPlataforma(l.url) !== "desconhecida" ? detectarPlataforma(l.url) : l.source)}</span><span class="badge">score ${l.score}</span>
        ${l.aderencia !== null ? `<span class="badge ${l.aderencia >= 75 ? "ok" : "acao"}">aderência ${l.aderencia}%</span>` : ""}
        <a href="${esc(l.url)}" target="_blank" rel="noopener">abrir vaga ↗</a> ${evidencia}
        ${l.cvPath ? `<a href="/cv/${l.id}" target="_blank" rel="noopener">CV usado ↓</a>` : ""}</p>
