@@ -9,6 +9,23 @@ export function normalize(s: string | null | undefined): string {
   return (s ?? "").replace(/\s+/g, " ").trim();
 }
 
+const DADOS_SENSIVEIS = [
+  /nome\s+(completo\s+)?d[ao]s?\s+(sua\s+)?(m[ãa]e|pai|genitor|respons[áa]vel)/i,
+  /filia[çc][ãa]o/i,
+  /religi[ãa]o|cren[çc]a/i,
+  /orienta[çc][ãa]o\s+sexual/i,
+  /cor\/ra[çc]a|ra[çc]a\/cor/i,
+  /dados?\s+banc[áa]rios?|ag[êe]ncia\s+e\s+conta|chave\s+pix/i,
+  /senha/i,
+  /t[íi]tulo\s+de\s+eleitor/i,
+  /certid[ãa]o\s+de\s+(nascimento|casamento)/i,
+  /nome\s+do\s+c[ôo]njuge|nome\s+d[oa]s?\s+filh[oa]s?/i,
+];
+
+export function ehDadoSensivel(pergunta: string): boolean {
+  return DADOS_SENSIVEIS.some((r) => r.test(pergunta));
+}
+
 export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta; locator: Locator }[]> {
   const result: { pergunta: Pergunta; locator: Locator }[] = [];
   const vistos = new Set<string>();
@@ -197,6 +214,17 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
     return {
       status: "needs_review",
       note: `${naoPreenchidas.length} campo(s) não preenchido(s) — ${naoPreenchidas.join(" | ").slice(0, 500)} — ${shot}`,
+      answers: answersJson,
+    };
+  }
+
+  const sensiveis = semResposta.filter((r) => ehDadoSensivel(r.pergunta));
+  if (sensiveis.length > 0) {
+    return {
+      status: "skipped",
+      note: `DESCARTADA — a empresa exige dado sensível impróprio para candidatura: ${sensiveis
+        .map((r) => `"${r.pergunta.slice(0, 80)}"`)
+        .join(" | ")}`,
       answers: answersJson,
     };
   }
