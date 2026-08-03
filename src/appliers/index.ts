@@ -41,7 +41,7 @@ export async function runAppliers(): Promise<ApplierRunResult> {
     .select({ application: applications, job: jobs })
     .from(applications)
     .innerJoin(jobs, eq(applications.jobId, jobs.id))
-    .where(and(eq(applications.status, "queued"), inArray(applications.method, ["greenhouse", "lever", "gupy"])))
+    .where(and(eq(applications.status, "queued"), inArray(applications.method, ["greenhouse", "lever", "ashby", "workable", "gupy"])))
     .all();
 
   const result: ApplierRunResult = { applied: 0, descartadas: 0, needsReview: 0, failed: 0 };

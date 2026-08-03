@@ -3,6 +3,7 @@ import { runAppliers } from "./appliers/index.js";
 import { closeBrowser } from "./appliers/browser.js";
 import { runDigest } from "./digest.js";
 import { ingestGupy } from "./ingest/gupy.js";
+import { ingestLever } from "./ingest/lever.js";
 import { ingestScraper } from "./ingest/scraper.js";
 import { enqueueJobs } from "./pipeline/queue.js";
 import { prune } from "./pipeline/prune.js";
@@ -27,6 +28,14 @@ async function main(): Promise<void> {
     jobs.push(...fromGupy);
   } catch (err) {
     console.error("[ingest] gupy falhou:", err instanceof Error ? err.message : err);
+  }
+
+  try {
+    const fromLever = await ingestLever();
+    console.log(`[ingest] lever: ${fromLever.length} vagas`);
+    jobs.push(...fromLever);
+  } catch (err) {
+    console.error("[ingest] lever falhou:", err instanceof Error ? err.message : err);
   }
 
   const enqueued = enqueueJobs(jobs);
