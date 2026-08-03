@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { like, sql } from "drizzle-orm";
 import type { Page } from "playwright";
 import { config } from "../config.js";
@@ -21,6 +22,33 @@ export interface EtapasResult {
   aguardandoHumano: number;
   semPendencia: number;
   falhas: number;
+}
+
+const HORAS_ESPERA = 12;
+
+function caminhoVisitas(): string {
+  return join(config.paths.dataDir, "etapas-visitadas.json");
+}
+
+function lerVisitas(): Record<string, string> {
+  try {
+    return JSON.parse(readFileSync(caminhoVisitas(), "utf8")) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function gravarVisitas(visitas: Record<string, string>): void {
+  try {
+    mkdirSync(config.paths.dataDir, { recursive: true });
+    writeFileSync(caminhoVisitas(), JSON.stringify(visitas));
+  } catch {}
+}
+
+function emCooldown(visitas: Record<string, string>, link: string): boolean {
+  const quando = visitas[link];
+  if (!quando) return false;
+  return Date.now() - new Date(quando).getTime() < HORAS_ESPERA * 60 * 60 * 1000;
 }
 
 function anotarPorTitulo(titulo: string, nota: string, etapa?: string): void {
@@ -84,9 +112,13 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
       await proxima.click().catch(() => {});
       await page.waitForTimeout(2500);
     }
-    console.log(`[etapas] ${links.length} candidatura(s) em andamento`);
+    const visitas = lerVisitas();
+    const pendentes = links.filter((l) => !emCooldown(visitas, l));
+    console.log(
+      `[etapas] ${links.length} candidatura(s) em andamento — ${pendentes.length} a checar (${links.length - pendentes.length} em cooldown)`,
+    );
 
-    for (const link of links) {
+    for (const link of pendentes) {
       try {
         await page.goto(link, { waitUntil: "networkidle" });
         await page.waitForTimeout(3000);
@@ -98,6 +130,8 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
           .first();
         if (!(await acao.isVisible().catch(() => false))) {
           result.semPendencia++;
+          visitas[link] = new Date().toISOString();
+          gravarVisitas(visitas);
           continue;
         }
 
