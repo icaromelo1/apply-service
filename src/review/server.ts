@@ -30,6 +30,8 @@ interface Linha {
   method: string;
   score: number;
   note: string | null;
+  aderencia: number | null;
+  cvPath: string | null;
   cover: string | null;
   answers: string | null;
   appliedAt: string | null;
@@ -47,6 +49,8 @@ function carregar(): Linha[] {
       method: applications.method,
       score: applications.score,
       note: applications.reviewNote,
+      aderencia: applications.aderencia,
+      cvPath: applications.cvPath,
       cover: applications.coverLetter,
       answers: applications.answers,
       appliedAt: applications.appliedAt,
@@ -112,7 +116,9 @@ function card(l: Linha, tipo: "acao" | "manual" | "enviada" | "morta"): string {
     <h3>${esc(l.title)}</h3>
     <p class="emp">${esc(l.company)}</p>
     <p>${selo}<span class="badge">${esc(l.source)}</span><span class="badge">score ${l.score}</span>
-       <a href="${esc(l.url)}" target="_blank" rel="noopener">abrir vaga ↗</a> ${evidencia}</p>
+       ${l.aderencia !== null ? `<span class="badge ${l.aderencia >= 75 ? "ok" : "acao"}">aderência ${l.aderencia}%</span>` : ""}
+       <a href="${esc(l.url)}" target="_blank" rel="noopener">abrir vaga ↗</a> ${evidencia}
+       ${l.cvPath ? `<a href="/cv/${l.id}" target="_blank" rel="noopener">CV usado ↓</a>` : ""}</p>
     ${faltando}${cover}${answers}${acoes}
   </article>`;
 }
@@ -213,6 +219,19 @@ export function startReviewServer(): void {
       } else {
         res.writeHead(404);
         res.end("screenshot não encontrado");
+      }
+      return;
+    }
+
+    const cvMatch = url.pathname.match(/^\/cv\/(\d+)$/);
+    if (req.method === "GET" && cvMatch) {
+      const linha = carregar().find((l) => l.id === Number(cvMatch[1]));
+      if (linha?.cvPath && existsSync(linha.cvPath)) {
+        res.writeHead(200, { "Content-Type": "application/pdf" });
+        createReadStream(linha.cvPath).pipe(res);
+      } else {
+        res.writeHead(404);
+        res.end("CV não encontrado");
       }
       return;
     }
