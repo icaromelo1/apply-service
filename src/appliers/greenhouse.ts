@@ -53,7 +53,11 @@ async function confirmacaoVisivel(page: Page): Promise<boolean> {
   );
 }
 
-async function resolverCodigo(page: Page, submit: import("playwright").Locator): Promise<boolean> {
+async function resolverCodigo(
+  page: Page,
+  submit: import("playwright").Locator,
+  empresa: string,
+): Promise<boolean> {
   if (!leituraDeEmailDisponivel()) return false;
 
   const desde = new Date(Date.now() - 10 * 60 * 1000);
@@ -61,7 +65,7 @@ async function resolverCodigo(page: Page, submit: import("playwright").Locator):
 
   for (let tentativa = 0; tentativa < 6 && !codigo; tentativa++) {
     await page.waitForTimeout(10000);
-    codigo = await buscarCodigoVerificacao(desde).catch(() => null);
+    codigo = await buscarCodigoVerificacao(desde, empresa).catch(() => null);
   }
   if (!codigo) return false;
 
@@ -224,7 +228,7 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
     }
 
     if (exigeCodigo) {
-      const resolvido = await resolverCodigo(page, submit);
+      const resolvido = await resolverCodigo(page, submit, job.company);
       if (!resolvido) {
         const shot = await saveScreenshot(page, applicationId);
         const motivo = leituraDeEmailDisponivel()

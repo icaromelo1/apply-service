@@ -127,6 +127,19 @@ async function preencherSelect(
   valor: string,
   opcoes: string[] = [],
 ): Promise<boolean> {
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    if (await tentarPreencherSelect(page, wrapper, valor, opcoes)) return true;
+    await page.waitForTimeout(600);
+  }
+  return false;
+}
+
+async function tentarPreencherSelect(
+  page: Page,
+  wrapper: Locator,
+  valor: string,
+  opcoes: string[] = [],
+): Promise<boolean> {
   const escolhido = melhorOpcao(valor, opcoes) ?? valor;
 
   const nativo = wrapper.locator("select");
