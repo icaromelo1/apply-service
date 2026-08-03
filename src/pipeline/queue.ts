@@ -2,17 +2,22 @@ import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { config } from "../config.js";
 import { db } from "../db/index.js";
 import { applications, jobs } from "../db/schema.js";
+import { detectarPlataforma, normalizarFonte } from "../appliers/plataforma.js";
 import type { ApplicationMethod, Job } from "../types.js";
 import { scoreJob } from "./score.js";
 
-const METHOD_BY_SOURCE: Record<string, ApplicationMethod> = {
+const METODO_POR_PLATAFORMA: Record<string, ApplicationMethod> = {
   greenhouse: "greenhouse",
   lever: "lever",
+  ashby: "ashby",
+  workable: "workable",
   gupy: "gupy",
 };
 
 function methodFor(job: Job): ApplicationMethod {
-  return METHOD_BY_SOURCE[job.source.toLowerCase()] ?? "digest";
+  const porUrl = METODO_POR_PLATAFORMA[detectarPlataforma(job.url)];
+  if (porUrl) return porUrl;
+  return METODO_POR_PLATAFORMA[normalizarFonte(job.source)] ?? "digest";
 }
 
 function cutoffTimestamp(days: number): string {

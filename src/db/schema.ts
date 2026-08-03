@@ -36,7 +36,7 @@ export const applications = sqliteTable(
       enum: ["queued", "needs_review", "applied", "skipped", "failed"],
     }).notNull(),
     method: text("method", {
-      enum: ["greenhouse", "lever", "gupy", "digest"],
+      enum: ["greenhouse", "lever", "ashby", "workable", "gupy", "digest"],
     }).notNull(),
     score: integer("score").notNull(),
     coverLetter: text("cover_letter"),

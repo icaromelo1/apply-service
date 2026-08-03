@@ -14,4 +14,4 @@ export interface Job {
 
 export type ApplicationStatus = "queued" | "needs_review" | "applied" | "skipped" | "failed";
 
-export type ApplicationMethod = "greenhouse" | "lever" | "gupy" | "digest";
+export type ApplicationMethod = "greenhouse" | "lever" | "ashby" | "workable" | "gupy" | "digest";
