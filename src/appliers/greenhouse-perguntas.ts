@@ -9,7 +9,8 @@ const EEO = /gender|transgender|sexual orientation|race|ethnicit|hispanic|latino
 
 function opcaoDeclinar(opcoes: string[]): string | null {
   const padroes = [
-    /decline to self.?identify/i, /prefer not to (say|answer|disclose)/i, /i (don.t|do not) wish to answer/i,
+    /decline to self.?identify/i, /prefer not to (say|answer|disclose)/i,
+    /i (don.t|do not) (wish|want) to answer/i, /(do not|don.t) wish to (self.?identify|disclose)/i,
     /prefiro n[ãa]o (informar|responder|declarar)/i, /n[ãa]o desejo (informar|responder)/i,
   ];
   for (const p of padroes) {
@@ -213,6 +214,8 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
 
   const PADROES_DECLINAR = [
     "Decline To Self Identify",
+    "I do not want to answer",
+    "I don't want to answer",
     "I don't wish to answer",
     "I do not wish to answer",
     "Prefer not to say",
