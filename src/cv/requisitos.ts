@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { config } from "../config.js";
 import { agyAvailable, agyPrompt, extrairJson } from "../llm-agy.js";
 import { normalizeText } from "../lib/text.js";
 import type { Job } from "../types.js";
@@ -155,7 +158,31 @@ function extrairHeuristica(job: Job): RequisitosVaga {
   };
 }
 
+function caminhoCache(job: Job): string {
+  return join(config.paths.requisitosDir, `${job.id.replace(/[^\w.-]/g, "_")}.json`);
+}
+
+function lerCache(job: Job): RequisitosVaga | null {
+  const caminho = caminhoCache(job);
+  if (!existsSync(caminho)) return null;
+  try {
+    return JSON.parse(readFileSync(caminho, "utf8")) as RequisitosVaga;
+  } catch {
+    return null;
+  }
+}
+
+function gravarCache(job: Job, requisitos: RequisitosVaga): void {
+  try {
+    mkdirSync(config.paths.requisitosDir, { recursive: true });
+    writeFileSync(caminhoCache(job), JSON.stringify(requisitos));
+  } catch {}
+}
+
 export async function extrairRequisitos(job: Job): Promise<RequisitosVaga> {
+  const cacheado = lerCache(job);
+  if (cacheado) return cacheado;
+
   if (!agyAvailable()) {
     return extrairHeuristica(job);
   }
@@ -163,7 +190,9 @@ export async function extrairRequisitos(job: Job): Promise<RequisitosVaga> {
   try {
     const saida = await agyPrompt(REQUISITOS_SYSTEM, jobContext(job));
     const dados = requisitosVagaSchema.parse(JSON.parse(extrairJson(saida)));
-    return limitarRequisitos(dados);
+    const requisitos = limitarRequisitos(dados);
+    gravarCache(job, requisitos);
+    return requisitos;
   } catch (err) {
     console.error(`[cv] extração via LLM falhou, usando heurística: ${err instanceof Error ? err.message.slice(0, 120) : err}`);
     return extrairHeuristica(job);
