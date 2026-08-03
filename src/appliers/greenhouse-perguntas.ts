@@ -3,7 +3,21 @@ import { llmAvailable, responderQuestionario, type Pergunta } from "../llm.js";
 import type { Job } from "../types.js";
 import { ehDadoSensivel, normalize } from "./gupy-flow.js";
 
-const IGNORAR = /first name|last name|email|phone|resume|cover letter|linkedin profile|website/i;
+const IGNORAR = /first name|last name|email|phone|resume|cover letter|linkedin profile|website|^attach|upload|curr[íi]culo|drag and drop|arraste/i;
+
+const EEO = /gender|transgender|sexual orientation|race|ethnicit|hispanic|latino|veteran|disability|pronoun|identidade de g[êe]nero|orienta[çc][ãa]o sexual|ra[çc]a|etnia|defici[êe]ncia/i;
+
+function opcaoDeclinar(opcoes: string[]): string | null {
+  const padroes = [
+    /decline to self.?identify/i, /prefer not to (say|answer|disclose)/i, /i (don.t|do not) wish to answer/i,
+    /prefiro n[ãa]o (informar|responder|declarar)/i, /n[ãa]o desejo (informar|responder)/i,
+  ];
+  for (const p of padroes) {
+    const achado = opcoes.find((o) => p.test(o));
+    if (achado) return achado;
+  }
+  return null;
+}
 
 interface Campo {
   rotulo: string;
@@ -95,7 +109,16 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
   const campos = await coletarCampos(page);
   if (campos.length === 0 || !llmAvailable()) return vazio;
 
-  const perguntas: Pergunta[] = campos.map((c) => ({
+  const eeo = campos.filter((c) => EEO.test(c.rotulo));
+  for (const campo of eeo) {
+    const declinar = opcaoDeclinar(campo.opcoes);
+    if (declinar) await preencherSelect(page, campo.wrapper, declinar).catch(() => false);
+  }
+
+  const restantes = campos.filter((c) => !EEO.test(c.rotulo));
+  if (restantes.length === 0) return { respondidas: eeo.length, semResposta: [], sensiveis: [], naoPreenchidas: [] };
+
+  const perguntas: Pergunta[] = restantes.map((c) => ({
     pergunta: c.rotulo,
     opcoes: c.opcoes.length > 0 ? c.opcoes : undefined,
   }));
@@ -104,7 +127,7 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
   const resultado: ResultadoPerguntas = { respondidas: 0, semResposta: [], sensiveis: [], naoPreenchidas: [] };
 
   for (const [i, resposta] of respostas.entries()) {
-    const campo = campos[i];
+    const campo = restantes[i];
     if (!campo) continue;
 
     if (ehDadoSensivel(campo.rotulo)) {
