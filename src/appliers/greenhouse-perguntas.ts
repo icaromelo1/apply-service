@@ -192,7 +192,7 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
     }
 
     const valor = resposta.resposta;
-    if (valor === null || /^(null|undefined|n\/a)$/i.test(valor.trim())) {
+    if (valor === null || /^(null|undefined)$/i.test(valor.trim())) {
       resultado.semResposta.push(campo.rotulo);
       continue;
     }

@@ -191,7 +191,7 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
   }
 
   const answersJson = JSON.stringify(respostas, null, 2);
-  const ehVazia = (r: string | null): boolean => r === null || /^(null|undefined|n\/a)$/i.test(r.trim());
+  const ehVazia = (r: string | null): boolean => r === null || /^(null|undefined)$/i.test(r.trim());
   const semResposta = respostas.filter((r) => ehVazia(r.resposta));
 
   const naoPreenchidas: string[] = [];
