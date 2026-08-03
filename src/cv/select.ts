@@ -9,12 +9,14 @@ import type {
   Experiencia,
   RequisitoVaga,
   RequisitosVaga,
+  Idioma,
 } from "./types.js";
 
 const CV_BASE_PATH = "profile/cv-base.json";
 
 const bulletSchema = z.object({
   texto: z.string(),
+  textoEn: z.string().optional(),
   tags: z.array(z.string()),
   peso: z.number(),
 });
@@ -22,6 +24,7 @@ const bulletSchema = z.object({
 const experienciaSchema = z.object({
   empresa: z.string(),
   cargo: z.string(),
+  cargoEn: z.string().optional(),
   local: z.string(),
   inicio: z.string(),
   fim: z.string(),
@@ -31,13 +34,16 @@ const experienciaSchema = z.object({
 
 const formacaoSchema = z.object({
   curso: z.string(),
+  cursoEn: z.string().optional(),
   instituicao: z.string(),
   periodo: z.string(),
   situacao: z.string().optional(),
+  situacaoEn: z.string().optional(),
 });
 
 const categoriaSkillSchema = z.object({
   categoria: z.string(),
+  categoriaEn: z.string().optional(),
   itens: z.array(z.string()),
   tags: z.array(z.string()),
 });
@@ -54,12 +60,13 @@ const contatoSchema = z.object({
 
 const cvBaseSchema = z.object({
   contato: contatoSchema,
-  titulosAlternativos: z.array(z.object({ titulo: z.string(), tags: z.array(z.string()) })),
-  resumos: z.array(z.object({ texto: z.string(), tags: z.array(z.string()) })),
+  titulosAlternativos: z.array(z.object({ titulo: z.string(), tituloEn: z.string().optional(), tags: z.array(z.string()) })),
+  resumos: z.array(z.object({ texto: z.string(), textoEn: z.string().optional(), tags: z.array(z.string()) })),
   experiencias: z.array(experienciaSchema),
   skills: z.array(categoriaSkillSchema),
   formacao: z.array(formacaoSchema),
   idiomas: z.array(z.string()),
+  idiomasEn: z.array(z.string()).optional(),
 });
 
 export function carregarCvBase(): CvBase {
@@ -155,15 +162,50 @@ function selecionarSkills(base: CvBase, requisitos: RequisitoVaga[]): CategoriaS
   return ordenados.slice(0, 6).map((item) => item.skill);
 }
 
-export function selecionarCv(base: CvBase, req: RequisitosVaga): CvSelecionado {
+function aplicarIdiomaTitulo(base: CvBase, titulo: string, idioma: Idioma): string {
+  const achado = base.titulosAlternativos.find((t) => t.titulo === titulo);
+  return txt(titulo, achado?.tituloEn, idioma);
+}
+
+function aplicarIdiomaResumo(base: CvBase, resumo: string, idioma: Idioma): string {
+  const achado = base.resumos.find((r) => r.texto === resumo);
+  return txt(resumo, achado?.textoEn, idioma);
+}
+
+function traduzirPeriodo(valor: string, idioma: Idioma): string {
+  if (idioma !== "en") return valor;
+  return valor.replace(/\bAtual\b/gi, "Present").replace(/\bPresente\b/gi, "Present");
+}
+
+function traduzirLocal(valor: string, idioma: Idioma): string {
+  if (idioma !== "en") return valor;
+  return valor.replace(/\bRemoto\b/gi, "Remote").replace(/\bH[íi]brido\b/gi, "Hybrid").replace(/\bPresencial\b/gi, "On-site");
+}
+
+function txt(pt: string, en: string | undefined, idioma: Idioma): string {
+  return idioma === "en" && en ? en : pt;
+}
+
+export function selecionarCv(base: CvBase, req: RequisitosVaga, idioma: Idioma = "pt"): CvSelecionado {
   const requisitos = req.requisitos;
   return {
+    idioma,
     contato: base.contato,
-    titulo: selecionarTitulo(base, requisitos),
-    resumo: selecionarResumo(base, requisitos),
-    experiencias: selecionarExperiencias(base, requisitos),
-    skills: selecionarSkills(base, requisitos),
-    formacao: base.formacao,
-    idiomas: base.idiomas,
+    titulo: aplicarIdiomaTitulo(base, selecionarTitulo(base, requisitos), idioma),
+    resumo: aplicarIdiomaResumo(base, selecionarResumo(base, requisitos), idioma),
+    experiencias: selecionarExperiencias(base, requisitos).map((e) => ({
+      ...e,
+      cargo: txt(e.cargo, e.cargoEn, idioma),
+      fim: traduzirPeriodo(e.fim, idioma),
+      local: traduzirLocal(e.local, idioma),
+      bullets: e.bullets.map((b) => ({ ...b, texto: txt(b.texto, b.textoEn, idioma) })),
+    })),
+    skills: selecionarSkills(base, requisitos).map((s) => ({ ...s, categoria: txt(s.categoria, s.categoriaEn, idioma) })),
+    formacao: base.formacao.map((f) => ({
+      ...f,
+      curso: txt(f.curso, f.cursoEn, idioma),
+      situacao: f.situacao ? txt(f.situacao, f.situacaoEn, idioma) : undefined,
+    })),
+    idiomas: idioma === "en" && base.idiomasEn ? base.idiomasEn : base.idiomas,
   };
 }

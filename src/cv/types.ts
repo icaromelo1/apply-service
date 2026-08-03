@@ -8,8 +8,11 @@ export interface Contato {
   github: string;
 }
 
+export type Idioma = "pt" | "en";
+
 export interface Bullet {
   texto: string;
+  textoEn?: string;
   tags: string[];
   peso: number;
 }
@@ -17,6 +20,7 @@ export interface Bullet {
 export interface Experiencia {
   empresa: string;
   cargo: string;
+  cargoEn?: string;
   local: string;
   inicio: string;
   fim: string;
@@ -26,25 +30,33 @@ export interface Experiencia {
 
 export interface Formacao {
   curso: string;
+  cursoEn?: string;
   instituicao: string;
   periodo: string;
   situacao?: string;
+  situacaoEn?: string;
 }
 
 export interface CategoriaSkill {
   categoria: string;
+  categoriaEn?: string;
   itens: string[];
   tags: string[];
 }
 
 export interface CvBase {
   contato: Contato;
-  titulosAlternativos: { titulo: string; tags: string[] }[];
-  resumos: { texto: string; tags: string[] }[];
+  titulosAlternativos: { titulo: string; tituloEn?: string; tags: string[] }[];
+  resumos: { texto: string; textoEn?: string; tags: string[] }[];
   experiencias: Experiencia[];
   skills: CategoriaSkill[];
   formacao: Formacao[];
   idiomas: string[];
+  idiomasEn?: string[];
+}
+
+export interface RequisitosVagaIdioma {
+  idioma: Idioma;
 }
 
 export interface RequisitoVaga {
@@ -60,6 +72,7 @@ export interface RequisitosVaga {
 
 export interface CvSelecionado {
   contato: Contato;
+  idioma: Idioma;
   titulo: string;
   resumo: string;
   experiencias: Experiencia[];

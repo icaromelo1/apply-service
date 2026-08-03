@@ -3,6 +3,15 @@ import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
 import type { CvSelecionado } from "./types.js";
 
+const SECOES = {
+  pt: { resumo: "RESUMO PROFISSIONAL", exp: "EXPERIÊNCIA PROFISSIONAL", skills: "COMPETÊNCIAS TÉCNICAS", form: "FORMAÇÃO", idiomas: "IDIOMAS", atual: "Atual" },
+  en: { resumo: "PROFESSIONAL SUMMARY", exp: "PROFESSIONAL EXPERIENCE", skills: "TECHNICAL SKILLS", form: "EDUCATION", idiomas: "LANGUAGES", atual: "Present" },
+} as const;
+
+function secoes(cv: CvSelecionado) {
+  return SECOES[cv.idioma ?? "pt"];
+}
+
 function esc(valor: string): string {
   return valor
     .replace(/&/g, "&amp;")
@@ -24,16 +33,18 @@ function montarContato(cv: CvSelecionado): string {
 }
 
 function montarResumo(cv: CvSelecionado): string {
+  const t = secoes(cv);
   if (!cv.resumo || cv.resumo.trim().length === 0) return "";
   return `
     <section>
-      <h2>RESUMO PROFISSIONAL</h2>
+      <h2>${t.resumo}</h2>
       <p>${esc(cv.resumo)}</p>
     </section>
   `;
 }
 
 function montarExperiencias(cv: CvSelecionado): string {
+  const t = secoes(cv);
   if (cv.experiencias.length === 0) return "";
   const itens = cv.experiencias
     .map((exp) => {
@@ -54,13 +65,14 @@ function montarExperiencias(cv: CvSelecionado): string {
     .join("\n");
   return `
     <section>
-      <h2>EXPERIÊNCIA PROFISSIONAL</h2>
+      <h2>${t.exp}</h2>
       ${itens}
     </section>
   `;
 }
 
 function montarSkills(cv: CvSelecionado): string {
+  const t = secoes(cv);
   if (cv.skills.length === 0) return "";
   const itens = cv.skills
     .map((cat) => {
@@ -70,13 +82,14 @@ function montarSkills(cv: CvSelecionado): string {
     .join("\n");
   return `
     <section>
-      <h2>COMPETÊNCIAS TÉCNICAS</h2>
+      <h2>${t.skills}</h2>
       <ul>${itens}</ul>
     </section>
   `;
 }
 
 function montarFormacao(cv: CvSelecionado): string {
+  const t = secoes(cv);
   if (cv.formacao.length === 0) return "";
   const itens = cv.formacao
     .map((f) => {
@@ -91,24 +104,26 @@ function montarFormacao(cv: CvSelecionado): string {
     .join("\n");
   return `
     <section>
-      <h2>FORMAÇÃO</h2>
+      <h2>${t.form}</h2>
       ${itens}
     </section>
   `;
 }
 
 function montarIdiomas(cv: CvSelecionado): string {
+  const t = secoes(cv);
   if (cv.idiomas.length === 0) return "";
   const itens = cv.idiomas.map((i) => `<li>${esc(i)}</li>`).join("\n");
   return `
     <section>
-      <h2>IDIOMAS</h2>
+      <h2>${t.idiomas}</h2>
       <ul>${itens}</ul>
     </section>
   `;
 }
 
 export function montarHtml(cv: CvSelecionado): string {
+  const t = SECOES[cv.idioma ?? "pt"];
   return `
     <!DOCTYPE html>
     <html lang="pt-BR">
