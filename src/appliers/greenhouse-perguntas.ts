@@ -34,12 +34,22 @@ function entrada(wrapper: Locator): Locator {
   return wrapper.locator(".select__input-container input, input[id^='react-select']").first();
 }
 
+function menuDe(wrapper: Locator): Locator {
+  return wrapper.locator(".select__menu, [class*='-menu']").first();
+}
+
+async function opcoesVisiveis(page: Page, wrapper: Locator): Promise<Locator> {
+  const proprio = menuDe(wrapper).locator("[role=option]");
+  if ((await proprio.count()) > 0) return proprio;
+  return page.locator("[role=option]");
+}
+
 async function abrirMenu(page: Page, wrapper: Locator): Promise<boolean> {
   const ctrl = controle(wrapper);
   if ((await ctrl.count()) === 0) return false;
   await ctrl.click({ timeout: 4000 });
   await page.waitForTimeout(500);
-  return (await page.locator("[role=option]").count()) > 0;
+  return (await (await opcoesVisiveis(page, wrapper)).count()) > 0;
 }
 
 async function opcoesDoSelect(page: Page, wrapper: Locator): Promise<string[]> {
@@ -50,7 +60,7 @@ async function opcoesDoSelect(page: Page, wrapper: Locator): Promise<string[]> {
 
   try {
     if (!(await abrirMenu(page, wrapper))) return [];
-    const opcoes = (await page.locator("[role=option]").allTextContents()).map(normalize).filter(Boolean);
+    const opcoes = (await (await opcoesVisiveis(page, wrapper)).allTextContents()).map(normalize).filter(Boolean);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(200);
     return opcoes;
@@ -117,7 +127,8 @@ async function preencherSelect(
   try {
     if (!(await abrirMenu(page, wrapper))) return false;
 
-    const exata = page.locator("[role=option]").filter({ hasText: new RegExp(`^\\s*${escapeRegex(escolhido)}\\s*$`, "i") }).first();
+    const opcoes_ = await opcoesVisiveis(page, wrapper);
+    const exata = opcoes_.filter({ hasText: new RegExp(`^\\s*${escapeRegex(escolhido)}\\s*$`, "i") }).first();
     if (await exata.isVisible().catch(() => false)) {
       await exata.click();
       await page.waitForTimeout(300);
@@ -128,7 +139,7 @@ async function preencherSelect(
     if ((await campo.count()) > 0) {
       await campo.fill(escolhido).catch(() => {});
       await page.waitForTimeout(600);
-      const primeira = page.locator("[role=option]").first();
+      const primeira = (await opcoesVisiveis(page, wrapper)).first();
       if (await primeira.isVisible().catch(() => false)) {
         await primeira.click();
         await page.waitForTimeout(300);
