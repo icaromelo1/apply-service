@@ -45,6 +45,9 @@ services:
       AGY_BIN: ${AGY_BIN:-/usr/local/bin/agy}
       AGY_MODEL: ${AGY_MODEL:-Gemini 3.6 Flash (Low)}
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_HOST: ${EMAIL_HOST:-imap.gmail.com}
       REVIEW_PASSWORD: ${REVIEW_PASSWORD:-}
       GUPY_AUTO_SUBMIT: ${GUPY_AUTO_SUBMIT:-false}
     ports:
