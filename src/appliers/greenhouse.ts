@@ -5,7 +5,7 @@ import { gerarCvParaVaga } from "../cv/index.js";
 import { gerarCoverLetter } from "../llm.js";
 import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
-import { responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
+import { aceitarTermos, responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
 
 const BOARD_TOKEN: Record<string, string> = { onepeloton: "peloton" };
 
@@ -155,6 +155,9 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
         note: `${perguntas.naoPreenchidas.length} campo(s) não preenchido(s): ${perguntas.naoPreenchidas.join(" | ").slice(0, 300)} — ${shot}`,
       };
     }
+
+    const termosMarcados = await aceitarTermos(page).catch(() => 0);
+    if (termosMarcados > 0) console.log(`[greenhouse] ${termosMarcados} termo(s) aceito(s)`);
 
     const submit = page
       .locator('button[type="submit"]:has-text("Submit"), #submit_app, button:has-text("Submit application")')

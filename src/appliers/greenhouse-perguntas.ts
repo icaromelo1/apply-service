@@ -168,6 +168,12 @@ async function preencherSelect(
 }
 
 async function digitarEConfirmar(page: Page, wrapper: Locator, valor: string): Promise<boolean> {
+  const combo = wrapper.locator(".select__input, input[id^='react-select']").first();
+  if ((await combo.count()) > 0) {
+    const escolhido = await selecionarAssincrono(page, wrapper, combo, valor);
+    if (escolhido) return true;
+  }
+
   const texto = wrapper.locator("input[type=text], input:not([type]), textarea").first();
   if ((await texto.count()) === 0) return false;
 
@@ -175,7 +181,7 @@ async function digitarEConfirmar(page: Page, wrapper: Locator, valor: string): P
     await texto.fill(valor);
     await page.waitForTimeout(700);
 
-    const sugestao = page.locator("[role=option], [role=listbox] li").first();
+    const sugestao = (await opcoesVisiveis(page, wrapper)).first();
     if (await sugestao.isVisible().catch(() => false)) {
       await sugestao.click();
       await page.waitForTimeout(300);
@@ -186,6 +192,68 @@ async function digitarEConfirmar(page: Page, wrapper: Locator, valor: string): P
   } catch {
     return false;
   }
+}
+
+async function selecionarAssincrono(
+  page: Page,
+  wrapper: Locator,
+  combo: Locator,
+  valor: string,
+): Promise<boolean> {
+  const termos = [valor, valor.split(/[,/]/)[0]?.trim() ?? valor];
+
+  for (const termo of termos) {
+    if (!termo) continue;
+    try {
+      await combo.click({ timeout: 4000 });
+      await combo.fill("");
+      await combo.type(termo, { delay: 60 });
+
+      for (let i = 0; i < 12; i++) {
+        await page.waitForTimeout(500);
+        const opcoes = await opcoesVisiveis(page, wrapper);
+        const total = await opcoes.count().catch(() => 0);
+        if (total === 0) continue;
+
+        const textos = (await opcoes.allTextContents()).map(normalize);
+        if (textos.some((t) => /loading|carregando/i.test(t))) continue;
+
+        const alvo = textos.findIndex((t) => combina(termo, t));
+        await opcoes.nth(alvo >= 0 ? alvo : 0).click();
+        await page.waitForTimeout(400);
+        if (await confirmado(wrapper, termo)) return true;
+        break;
+      }
+    } catch {}
+  }
+  return false;
+}
+
+export async function aceitarTermos(page: Page): Promise<number> {
+  const TERMOS = /terms|consent|privacy|policy|agree|acknowledge|autoriz|concord|aceito|pol[íi]tica|termo/i;
+  const caixas = page.locator("input[type=checkbox]");
+  const total = Math.min(await caixas.count().catch(() => 0), 20);
+  let marcadas = 0;
+
+  for (let i = 0; i < total; i++) {
+    const caixa = caixas.nth(i);
+    if (await caixa.isChecked().catch(() => true)) continue;
+    if (!(await caixa.isVisible().catch(() => false))) continue;
+
+    const contexto = normalize(
+      await caixa
+        .locator("xpath=ancestor::*[self::div or self::fieldset or self::label][1]")
+        .textContent()
+        .catch(() => null),
+    );
+    const obrigatorio = (await caixa.getAttribute("aria-required").catch(() => null)) === "true";
+    if (!obrigatorio && !TERMOS.test(contexto)) continue;
+
+    await caixa.check({ timeout: 4000 }).catch(() => {});
+    if (await caixa.isChecked().catch(() => false)) marcadas++;
+  }
+
+  return marcadas;
 }
 
 function escapeRegex(texto: string): string {

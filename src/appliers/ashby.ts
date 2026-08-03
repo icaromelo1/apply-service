@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import { gerarCvParaVaga } from "../cv/index.js";
 import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
-import { responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
+import { aceitarTermos, responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
 
 async function preencher(page: import("playwright").Page, seletores: string[], valor: string): Promise<boolean> {
   for (const seletor of seletores) {
@@ -79,6 +79,8 @@ export async function applyAshby(applicationId: number, job: Job): Promise<Apply
         note: `DADO FALTANDO NO PERFIL (${perguntas.semResposta.length}): ${perguntas.semResposta.join(" | ").slice(0, 250)} — ${shot}`,
       };
     }
+
+    await aceitarTermos(page).catch(() => 0);
 
     const enviar = page.locator('button[type="submit"], button:has-text("Submit")').first();
     if ((await enviar.count()) === 0) {
