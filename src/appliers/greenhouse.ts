@@ -7,6 +7,42 @@ import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
 import { responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
 
+const BOARD_TOKEN: Record<string, string> = { onepeloton: "peloton" };
+
+function boardToken(company: string): string {
+  const limpo = company.toLowerCase().trim();
+  return BOARD_TOKEN[limpo] ?? limpo.replace(/[^a-z0-9]/g, "");
+}
+
+export type SituacaoVaga =
+  | { tipo: "greenhouse"; url: string }
+  | { tipo: "expirada" }
+  | { tipo: "site-proprio"; url: string }
+  | { tipo: "indeterminada" };
+
+export async function situacaoVaga(job: Job): Promise<SituacaoVaga> {
+  const jid = job.url.match(/[?&]gh_jid=(\d+)/i)?.[1] ?? job.url.match(/greenhouse\.io\/[^/]+\/jobs\/(\d+)/i)?.[1];
+  const token = boardToken(job.company);
+  if (!jid || !token) return { tipo: "indeterminada" };
+
+  try {
+    const resp = await fetch(`https://boards-api.greenhouse.io/v1/boards/${token}/jobs/${jid}`, {
+      signal: AbortSignal.timeout(15000),
+    });
+    if (resp.status === 404) return { tipo: "expirada" };
+    if (!resp.ok) return { tipo: "indeterminada" };
+
+    const dados = (await resp.json()) as { absolute_url?: string };
+    const alvo = dados.absolute_url;
+    if (!alvo) return { tipo: "indeterminada" };
+
+    if (/(job-boards|boards)\.greenhouse\.io/i.test(alvo)) return { tipo: "greenhouse", url: alvo };
+    return { tipo: "site-proprio", url: alvo };
+  } catch {
+    return { tipo: "indeterminada" };
+  }
+}
+
 async function fillFirst(page: Page, selectors: string[], value: string): Promise<boolean> {
   for (const selector of selectors) {
     const field = page.locator(selector).first();
@@ -32,7 +68,21 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
   page.setDefaultTimeout(15000);
 
   try {
-    await page.goto(job.url, { waitUntil: "domcontentloaded" });
+    const situacao = await situacaoVaga(job);
+    if (situacao.tipo === "expirada") {
+      await context.close();
+      return { status: "skipped", note: "vaga encerrada — removida do board do Greenhouse" };
+    }
+    if (situacao.tipo === "site-proprio") {
+      await context.close();
+      return {
+        status: "needs_review",
+        virarDigest: true,
+        note: `site de carreira próprio (sem form Greenhouse) — aplicar em ${situacao.url}`,
+      };
+    }
+
+    await page.goto(situacao.tipo === "greenhouse" ? situacao.url : job.url, { waitUntil: "domcontentloaded" });
 
     const applyButton = page
       .locator('a:has-text("Apply"), button:has-text("Apply"), a:has-text("Candidatar")')

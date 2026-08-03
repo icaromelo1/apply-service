@@ -61,6 +61,7 @@ export async function runAppliers(): Promise<ApplierRunResult> {
       db.update(applications)
         .set({
           status: outcome.status,
+          method: outcome.virarDigest ? "digest" : application.method,
           reviewNote: outcome.note ?? null,
           aderencia: outcome.aderencia ?? null,
           cvPath: outcome.cvPath ?? null,

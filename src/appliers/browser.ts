@@ -38,4 +38,5 @@ export interface ApplyOutcome {
   cvPath?: string;
   note?: string;
   answers?: string;
+  virarDigest?: boolean;
 }
