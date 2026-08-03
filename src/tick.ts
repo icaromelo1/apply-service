@@ -4,6 +4,7 @@ import { closeBrowser } from "./appliers/browser.js";
 import { runDigest } from "./digest.js";
 import { reportarSaude } from "./saude.js";
 import { ingestGupy } from "./ingest/gupy.js";
+import { ingestAshby } from "./ingest/ashby.js";
 import { ingestLever } from "./ingest/lever.js";
 import { ingestScraper } from "./ingest/scraper.js";
 import { enqueueJobs } from "./pipeline/queue.js";
@@ -44,6 +45,14 @@ console.log(`[tick] início ${new Date().toISOString()}`);
     jobs.push(...fromLever);
   } catch (err) {
     console.error("[ingest] lever falhou:", err instanceof Error ? err.message : err);
+  }
+
+  try {
+    const fromAshby = await ingestAshby();
+    console.log(`[ingest] ashby: ${fromAshby.length} vagas`);
+    jobs.push(...fromAshby);
+  } catch (err) {
+    console.error("[ingest] ashby falhou:", err instanceof Error ? err.message : err);
   }
 
   const enqueued = enqueueJobs(jobs);

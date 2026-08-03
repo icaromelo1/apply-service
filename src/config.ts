@@ -52,6 +52,7 @@ const paths = {
   cvsDir: "data/cvs",
   requisitosDir: "data/requisitos",
   leverEmpresasPath: "profile/lever-empresas.json",
+  ashbyEmpresasPath: "profile/ashby-empresas.json",
   candidatoPath: "profile/candidato.json",
   gupySessionPath: "profile/sessions/gupy.json",
   screenshotsDir: "data/screenshots",
