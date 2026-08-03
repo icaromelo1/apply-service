@@ -4,7 +4,13 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const AGY_BIN = process.env.AGY_BIN ?? "/usr/local/bin/agy";
+const CAMINHOS_AGY = [
+  process.env.AGY_BIN,
+  "/usr/local/bin/agy",
+  `${process.env.HOME ?? ""}/.local/bin/agy`,
+].filter((c): c is string => Boolean(c));
+
+const AGY_BIN = CAMINHOS_AGY.find((c) => existsSync(c)) ?? CAMINHOS_AGY[0]!;
 const AGY_MODEL = process.env.AGY_MODEL ?? "Gemini 3.6 Flash (Low)";
 const AGY_CWD = process.env.AGY_CWD ?? "/tmp";
 const TIMEOUT_MS = 180_000;

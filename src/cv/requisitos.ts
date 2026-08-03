@@ -160,9 +160,14 @@ export async function extrairRequisitos(job: Job): Promise<RequisitosVaga> {
     return extrairHeuristica(job);
   }
 
-  const saida = await agyPrompt(REQUISITOS_SYSTEM, jobContext(job));
-  const dados = requisitosVagaSchema.parse(JSON.parse(extrairJson(saida)));
-  return limitarRequisitos(dados);
+  try {
+    const saida = await agyPrompt(REQUISITOS_SYSTEM, jobContext(job));
+    const dados = requisitosVagaSchema.parse(JSON.parse(extrairJson(saida)));
+    return limitarRequisitos(dados);
+  } catch (err) {
+    console.error(`[cv] extração via LLM falhou, usando heurística: ${err instanceof Error ? err.message.slice(0, 120) : err}`);
+    return extrairHeuristica(job);
+  }
 }
 
 type DicionarioSinonimos = Record<string, string[]>;
@@ -192,8 +197,13 @@ const DICIONARIO_SINONIMOS: DicionarioSinonimos = {
   "banco relacional": ["sql"],
 };
 
+function semPontuacao(s: string): string {
+  return s.replace(/[.\-_/\\+#]/g, "").replace(/\s+/g, " ").trim();
+}
+
 export function normalizarTermo(termo: string): string[] {
   const normalizado = normalizeText(termo).trim();
-  const sinonimos = DICIONARIO_SINONIMOS[normalizado] ?? [];
-  return [normalizado, ...sinonimos];
+  const sinonimos = DICIONARIO_SINONIMOS[normalizado] ?? DICIONARIO_SINONIMOS[semPontuacao(normalizado)] ?? [];
+  const variantes = new Set([normalizado, semPontuacao(normalizado), ...sinonimos.flatMap((s) => [s, semPontuacao(s)])]);
+  return [...variantes].filter(Boolean);
 }
