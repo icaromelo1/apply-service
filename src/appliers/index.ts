@@ -31,6 +31,7 @@ function rowToJob(row: typeof jobs.$inferSelect): Job {
 
 export interface ApplierRunResult {
   applied: number;
+  descartadas: number;
   needsReview: number;
   failed: number;
 }
@@ -43,7 +44,7 @@ export async function runAppliers(): Promise<ApplierRunResult> {
     .where(and(eq(applications.status, "queued"), inArray(applications.method, ["greenhouse", "lever", "gupy"])))
     .all();
 
-  const result: ApplierRunResult = { applied: 0, needsReview: 0, failed: 0 };
+  const result: ApplierRunResult = { applied: 0, descartadas: 0, needsReview: 0, failed: 0 };
 
   try {
     for (const { application, job } of pending) {
@@ -67,6 +68,7 @@ export async function runAppliers(): Promise<ApplierRunResult> {
         .run();
 
       if (outcome.status === "applied") result.applied++;
+      else if (outcome.status === "skipped") result.descartadas++;
       else if (outcome.status === "needs_review") result.needsReview++;
       else result.failed++;
     }
