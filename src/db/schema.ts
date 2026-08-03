@@ -44,6 +44,7 @@ export const applications = sqliteTable(
     reviewNote: text("review_note"),
     aderencia: integer("aderencia"),
     cvPath: text("cv_path"),
+  etapa: text("etapa"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),

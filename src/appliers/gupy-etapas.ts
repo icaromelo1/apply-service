@@ -23,7 +23,7 @@ export interface EtapasResult {
   falhas: number;
 }
 
-function anotarPorTitulo(titulo: string, nota: string): void {
+function anotarPorTitulo(titulo: string, nota: string, etapa?: string): void {
   const rows = db
     .select({ id: applications.id, title: jobs.title })
     .from(applications)
@@ -35,7 +35,7 @@ function anotarPorTitulo(titulo: string, nota: string): void {
   if (!alvo) return;
 
   db.update(applications)
-    .set({ reviewNote: nota, updatedAt: sql`CURRENT_TIMESTAMP` })
+    .set({ reviewNote: nota, ...(etapa ? { etapa } : {}), updatedAt: sql`CURRENT_TIMESTAMP` })
     .where(sql`${applications.id} = ${alvo.id}`)
     .run();
 }
@@ -110,7 +110,7 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
 
         if (exigeHumano(slug) || exigeHumano(normalize(await page.textContent("h1, h2").catch(() => "")))) {
           const shot = await saveScreenshot(page, 0);
-          anotarPorTitulo(titulo, `etapa exige você (${slug || "teste/entrevista"}) — ${shot}`);
+          anotarPorTitulo(titulo, `etapa exige você (${slug || "teste/entrevista"}) — ${shot}`, `aguardando você: ${slug || "teste/entrevista"}`);
           result.aguardandoHumano++;
           continue;
         }
@@ -132,7 +132,11 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
 
         const outcome = await responderEEnviar(page, 0, job);
         console.log(`[etapas] ${titulo} → ${outcome.status}${outcome.note ? ` (${outcome.note})` : ""}`);
-        anotarPorTitulo(titulo, `etapa ${slug || "questionário"}: ${outcome.status} — ${outcome.note ?? ""}`);
+        anotarPorTitulo(
+          titulo,
+          `etapa ${slug || "questionário"}: ${outcome.status} — ${outcome.note ?? ""}`,
+          outcome.status === "applied" ? `avançou: ${slug || "questionário"}` : `travou: ${slug || "questionário"}`,
+        );
 
         if (outcome.status === "applied") result.avancadas++;
         else if (outcome.status === "failed") result.falhas++;

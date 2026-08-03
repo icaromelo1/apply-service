@@ -36,6 +36,7 @@ interface Linha {
   cover: string | null;
   answers: string | null;
   appliedAt: string | null;
+  etapa: string | null;
   title: string;
   company: string;
   url: string;
@@ -55,6 +56,7 @@ function carregar(): Linha[] {
       cover: applications.coverLetter,
       answers: applications.answers,
       appliedAt: applications.appliedAt,
+      etapa: applications.etapa,
       title: jobs.title,
       company: jobs.company,
       url: jobs.url,
@@ -104,6 +106,8 @@ function card(l: Linha, tipo: "acao" | "manual" | "enviada" | "morta"): string {
            </form>`
         : "";
 
+  const etapa = l.etapa ? `<span class="badge etapa">${esc(l.etapa)}</span>` : "";
+
   const selo =
     tipo === "manual"
       ? `<span class="badge manual">NÃO aplicada — aplique você</span>`
@@ -116,7 +120,7 @@ function card(l: Linha, tipo: "acao" | "manual" | "enviada" | "morta"): string {
   return `<article>
     <h3>${esc(l.title)}</h3>
     <p class="emp">${esc(l.company)}</p>
-    <p>${selo}<span class="badge">${esc(detectarPlataforma(l.url) !== "desconhecida" ? detectarPlataforma(l.url) : l.source)}</span><span class="badge">score ${l.score}</span>
+    <p>${selo}${etapa}<span class="badge">${esc(detectarPlataforma(l.url) !== "desconhecida" ? detectarPlataforma(l.url) : l.source)}</span><span class="badge">score ${l.score}</span>
        ${l.aderencia !== null ? `<span class="badge ${l.aderencia >= 75 ? "ok" : "acao"}">aderência ${l.aderencia}%</span>` : ""}
        <a href="${esc(l.url)}" target="_blank" rel="noopener">abrir vaga ↗</a> ${evidencia}
        ${l.cvPath ? `<a href="/cv/${l.id}" target="_blank" rel="noopener">CV usado ↓</a>` : ""}</p>
@@ -162,6 +166,7 @@ function pagina(): string {
          display:inline-block;color:#c3ccd9}
   .badge.ok{background:#14532d;color:#bbf7d0}
   .badge.manual{background:#7c2d12;color:#fed7aa}
+  .badge.etapa{background:#1e3a5f;color:#bfdbfe;margin-left:6px}
   .badge.acao{background:#78350f;color:#fde68a}
   .badge.morta{background:#3f1d1d;color:#fca5a5}
   a{color:#7ab7ff;font-size:.85rem;text-decoration:none;margin-right:10px}
