@@ -14,7 +14,7 @@ export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta
   const vistos = new Set<string>();
 
   const enunciados = page
-    .locator("h3, fieldset > label, .form-group > label, legend")
+    .locator("h3, h4, legend, .form-group__label label, .form-group label, fieldset label, form label")
     .filter({ hasText: /^\s*\d+\s*[.)]/ });
 
   const count = await enunciados.count();
