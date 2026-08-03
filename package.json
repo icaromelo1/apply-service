@@ -19,6 +19,7 @@
     "@google/genai": "^2.15.0",
     "better-sqlite3": "^11.10.0",
     "drizzle-orm": "^0.44.2",
+    "imapflow": "^1.6.5",
     "playwright": "1.62.0",
     "zod": "^3.24.2"
   },

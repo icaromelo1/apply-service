@@ -6,6 +6,7 @@ import { gerarCoverLetter } from "../llm.js";
 import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
 import { aceitarTermos, responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
+import { buscarCodigoVerificacao, leituraDeEmailDisponivel } from "../lib/codigo-email.js";
 
 const BOARD_TOKEN: Record<string, string> = { onepeloton: "peloton" };
 
@@ -41,6 +42,39 @@ export async function situacaoVaga(job: Job): Promise<SituacaoVaga> {
   } catch {
     return { tipo: "indeterminada" };
   }
+}
+
+async function resolverCodigo(page: Page, submit: import("playwright").Locator): Promise<boolean> {
+  if (!leituraDeEmailDisponivel()) return false;
+
+  const desde = new Date(Date.now() - 10 * 60 * 1000);
+  let codigo: string | null = null;
+
+  for (let tentativa = 0; tentativa < 6 && !codigo; tentativa++) {
+    await page.waitForTimeout(10000);
+    codigo = await buscarCodigoVerificacao(desde).catch(() => null);
+  }
+  if (!codigo) return false;
+
+  const caixas = page.locator('input[maxlength="1"], .security-code input, input[autocomplete="one-time-code"]');
+  const total = await caixas.count().catch(() => 0);
+
+  if (total >= codigo.length) {
+    for (let i = 0; i < codigo.length; i++) {
+      await caixas.nth(i).fill(codigo[i] ?? "").catch(() => {});
+    }
+  } else {
+    const unico = page.locator('input[autocomplete="one-time-code"], input[name*="code" i]').first();
+    if ((await unico.count()) === 0) return false;
+    await unico.fill(codigo).catch(() => {});
+  }
+
+  await page.waitForTimeout(1500);
+  if (await submit.isEnabled().catch(() => false)) {
+    await submit.click().catch(() => {});
+    return true;
+  }
+  return false;
 }
 
 async function fillFirst(page: Page, selectors: string[], value: string): Promise<boolean> {
@@ -168,6 +202,18 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
     }
 
     await submit.click();
+
+    const verificacao = page.locator('text=/verification code|c[óo]digo de verifica[çc][ãa]o/i').first();
+    if (await verificacao.isVisible().catch(() => false)) {
+      const resolvido = await resolverCodigo(page, submit);
+      if (!resolvido) {
+        const shot = await saveScreenshot(page, applicationId);
+        const motivo = leituraDeEmailDisponivel()
+          ? "código de verificação não chegou a tempo no e-mail"
+          : "vaga exige código de verificação por e-mail — configure EMAIL_USER/EMAIL_PASSWORD";
+        return { status: "needs_review", note: `${motivo} — ${shot}` };
+      }
+    }
 
     const confirmation = page.locator('text=/thank you|application.*(submitted|received)|obrigado/i');
     const erros = page.locator('.error, [class*="error"]:visible, [role="alert"]');
