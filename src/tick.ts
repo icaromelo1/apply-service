@@ -9,10 +9,16 @@ import { ingestLever } from "./ingest/lever.js";
 import { ingestScraper } from "./ingest/scraper.js";
 import { enqueueJobs } from "./pipeline/queue.js";
 import { prune } from "./pipeline/prune.js";
+import { adquirirTrava, liberarTrava } from "./lib/trava.js";
 import type { Job } from "./types.js";
 
 async function main(): Promise<void> {
-  const LIMITE_MS = Number(process.env.TICK_LIMITE_MIN ?? 75) * 60 * 1000;
+  if (!adquirirTrava("appliers")) {
+  console.error("[tick] já existe uma execução em andamento — abortando");
+  process.exit(1);
+}
+
+const LIMITE_MS = Number(process.env.TICK_LIMITE_MIN ?? 75) * 60 * 1000;
 const watchdog = setTimeout(() => {
   console.error(`[tick] watchdog: excedeu ${LIMITE_MS / 60000} min, encerrando`);
   process.exit(2);
@@ -71,6 +77,7 @@ console.log(`[tick] início ${new Date().toISOString()}`);
 
   clearTimeout(watchdog);
   await closeBrowser();
+  liberarTrava("appliers");
   }
 
   try {
