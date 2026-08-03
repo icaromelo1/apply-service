@@ -3,7 +3,7 @@ import { llmAvailable, responderQuestionario, type Pergunta } from "../llm.js";
 import type { Job } from "../types.js";
 import { combina, ehDadoSensivel, normalize } from "./gupy-flow.js";
 
-const IGNORAR = /first name|last name|email|phone|resume|cover letter|linkedin profile|website|^attach|upload|curr[íi]culo|drag and drop|arraste/i;
+const IGNORAR = /first name|last name|email|phone|resume|cover letter|linkedin|website|^attach|upload|curr[íi]culo|drag and drop|arraste/i;
 
 const EEO = /gender|transgender|sexual orientation|race|ethnicit|hispanic|latino|veteran|disability|pronoun|identidade de g[êe]nero|orienta[çc][ãa]o sexual|ra[çc]a|etnia|defici[êe]ncia/i;
 
@@ -211,10 +211,24 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
   const campos = await coletarCampos(page);
   if (campos.length === 0 || !llmAvailable()) return vazio;
 
+  const PADROES_DECLINAR = [
+    "Decline To Self Identify",
+    "I don't wish to answer",
+    "I do not wish to answer",
+    "Prefer not to say",
+  ];
+
   const eeo = campos.filter((c) => EEO.test(c.rotulo));
   for (const campo of eeo) {
     const declinar = opcaoDeclinar(campo.opcoes);
-    if (declinar) await preencherSelect(page, campo.wrapper, declinar, campo.opcoes).catch(() => false);
+    if (declinar) {
+      const ok = await preencherSelect(page, campo.wrapper, declinar, campo.opcoes).catch(() => false);
+      if (ok) continue;
+    }
+    for (const tentativa of PADROES_DECLINAR) {
+      const ok = await preencherSelect(page, campo.wrapper, tentativa, campo.opcoes).catch(() => false);
+      if (ok) break;
+    }
   }
 
   const restantes = campos.filter((c) => !EEO.test(c.rotulo));

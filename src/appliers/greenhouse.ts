@@ -101,6 +101,13 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
     const filledLast = await fillFirst(page, ['#last_name', 'input[name="last_name"]', 'input[autocomplete="family-name"]'], candidato.sobrenome);
     const filledEmail = await fillFirst(page, ['#email', 'input[name="email"]', 'input[type="email"]'], candidato.email);
     await fillFirst(page, ['#phone', 'input[name="phone"]', 'input[type="tel"]'], candidato.telefone);
+    if (candidato.linkedin) {
+      await fillFirst(
+        page,
+        ['input[aria-label*="LinkedIn" i]', 'input[id*="linkedin" i]', 'input[name*="linkedin" i]'],
+        candidato.linkedin,
+      );
+    }
 
     if (!filledFirst || !filledLast || !filledEmail) {
       const shot = await saveScreenshot(page, applicationId);
