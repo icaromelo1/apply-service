@@ -102,7 +102,8 @@ export async function coletarCampos(page: Page): Promise<Campo[]> {
     });
 
     const ultimo = campos[campos.length - 1];
-    if (ultimo && ultimo.tipo === "select" && ultimo.opcoes.length === 0 && temTexto) {
+    const reactSelect = (await wrapper.locator(".select__control, [class*='-control']").count().catch(() => 0)) > 0;
+    if (ultimo && ultimo.tipo === "select" && ultimo.opcoes.length === 0 && temTexto && !reactSelect) {
       ultimo.tipo = "texto";
     }
   }
@@ -290,16 +291,31 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
   ];
 
   const eeo = campos.filter((c) => EEO.test(c.rotulo));
+  const eeoSemSaida: string[] = [];
+
   for (const campo of eeo) {
+    let ok = false;
+
     const declinar = opcaoDeclinar(campo.opcoes);
-    if (declinar) {
-      const ok = await preencherSelect(page, campo.wrapper, declinar, campo.opcoes).catch(() => false);
-      if (ok) continue;
+    if (declinar) ok = await preencherSelect(page, campo.wrapper, declinar, campo.opcoes).catch(() => false);
+
+    if (!ok) {
+      for (const tentativa of PADROES_DECLINAR) {
+        ok = await preencherSelect(page, campo.wrapper, tentativa, campo.opcoes).catch(() => false);
+        if (ok) break;
+      }
     }
-    for (const tentativa of PADROES_DECLINAR) {
-      const ok = await preencherSelect(page, campo.wrapper, tentativa, campo.opcoes).catch(() => false);
-      if (ok) break;
+
+    if (!ok) {
+      const obrigatorio =
+        /\*\s*$/.test(campo.rotulo) ||
+        (await campo.wrapper.locator("[aria-required=true]").count().catch(() => 0)) > 0;
+      if (obrigatorio) eeoSemSaida.push(campo.rotulo);
     }
+  }
+
+  if (eeoSemSaida.length > 0) {
+    return { respondidas: 0, semResposta: [], sensiveis: eeoSemSaida, naoPreenchidas: [] };
   }
 
   const restantes = campos.filter((c) => !EEO.test(c.rotulo));
