@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import type { Page } from "playwright";
 import { config } from "../config.js";
+import { gerarCvParaVaga } from "../cv/index.js";
 import { gerarCoverLetter } from "../llm.js";
 import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
@@ -60,7 +61,8 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
       const shot = await saveScreenshot(page, applicationId);
       return { status: "needs_review", note: `campo de currículo não encontrado — ${shot}` };
     }
-    await resumeInput.setInputFiles(config.paths.curriculoPath);
+    const cv = await gerarCvParaVaga(job);
+    await resumeInput.setInputFiles(cv.caminho);
 
     const coverField = page
       .locator('#cover_letter_text, textarea[name="cover_letter_text"], textarea[name*="cover"]')
@@ -93,7 +95,7 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
 
     const confirmation = page.locator('text=/thank you|application.*(submitted|received)|obrigado/i');
     if ((await confirmation.count()) > 0) {
-      return { status: "applied" };
+      return { status: "applied", aderencia: cv.score?.cobertura, cvPath: cv.sobMedida ? cv.caminho : undefined };
     }
 
     const shot = await saveScreenshot(page, applicationId);

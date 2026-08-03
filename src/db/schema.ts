@@ -42,6 +42,8 @@ export const applications = sqliteTable(
     coverLetter: text("cover_letter"),
     answers: text("answers"),
     reviewNote: text("review_note"),
+    aderencia: integer("aderencia"),
+    cvPath: text("cv_path"),
     createdAt: text("created_at")
       .notNull()
       .default(sql`CURRENT_TIMESTAMP`),

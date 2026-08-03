@@ -34,6 +34,8 @@ export async function hasCaptcha(page: Page): Promise<boolean> {
 
 export interface ApplyOutcome {
   status: "applied" | "needs_review" | "failed";
+  aderencia?: number;
+  cvPath?: string;
   note?: string;
   answers?: string;
 }

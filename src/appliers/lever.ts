@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { config } from "../config.js";
+import { gerarCvParaVaga } from "../cv/index.js";
 import { gerarCoverLetter } from "../llm.js";
 import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
@@ -49,7 +50,8 @@ export async function applyLever(applicationId: number, job: Job): Promise<Apply
       const shot = await saveScreenshot(page, applicationId);
       return { status: "needs_review", note: `campo de currículo não encontrado — ${shot}` };
     }
-    await resume.setInputFiles(config.paths.curriculoPath);
+    const cv = await gerarCvParaVaga(job);
+    await resume.setInputFiles(cv.caminho);
 
     const comments = page.locator('textarea[name="comments"]').first();
     if ((await comments.count()) > 0) {
@@ -75,7 +77,7 @@ export async function applyLever(applicationId: number, job: Job): Promise<Apply
     await page.waitForLoadState("networkidle").catch(() => {});
 
     if (page.url().includes("/thanks") || (await page.locator('text=/thank|application.*submitted/i').count()) > 0) {
-      return { status: "applied" };
+      return { status: "applied", aderencia: cv.score?.cobertura, cvPath: cv.sobMedida ? cv.caminho : undefined };
     }
 
     const shot = await saveScreenshot(page, applicationId);

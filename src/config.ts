@@ -47,6 +47,8 @@ const paths = {
   criteriosPath: "profile/criterios.json",
   perfilPath: "profile/perfil.md",
   curriculoPath: "profile/curriculo.pdf",
+  cvBasePath: "profile/cv-base.json",
+  cvsDir: "data/cvs",
   candidatoPath: "profile/candidato.json",
   gupySessionPath: "profile/sessions/gupy.json",
   screenshotsDir: "data/screenshots",

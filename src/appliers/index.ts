@@ -57,6 +57,8 @@ export async function runAppliers(): Promise<ApplierRunResult> {
         .set({
           status: outcome.status,
           reviewNote: outcome.note ?? null,
+          aderencia: outcome.aderencia ?? null,
+          cvPath: outcome.cvPath ?? null,
           answers: outcome.answers ?? null,
           updatedAt: sql`CURRENT_TIMESTAMP`,
           appliedAt: outcome.status === "applied" ? sql`CURRENT_TIMESTAMP` : null,
