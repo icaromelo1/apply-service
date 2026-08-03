@@ -80,6 +80,9 @@ export async function coletarCampos(page: Page): Promise<Campo[]> {
     if (!rotulo || rotulo.length < 4 || IGNORAR.test(rotulo)) continue;
     if (campos.some((c) => c.rotulo === rotulo)) continue;
 
+    const telefone = await wrapper.locator("input[type=tel], .PhoneInput, [class*='phone']").count().catch(() => 0);
+    if (telefone > 0) continue;
+
     const temSelect =
       (await wrapper.locator("select, .select-shell, [class*='-container']").count().catch(() => 0)) > 0;
     const temTexto = (await wrapper.locator("input[type=text], textarea").count().catch(() => 0)) > 0;
