@@ -262,9 +262,20 @@ export async function applyGreenhouse(applicationId: number, job: Job): Promise<
 
       const enviando = await submit.isDisabled().catch(() => false);
       const aindaNoForm = (await submit.count().catch(() => 0)) > 0;
-      if (!enviando && !aindaNoForm) break;
+      if (!enviando && !aindaNoForm) {
+        for (let espera = 0; espera < 6 && !confirmado; espera++) {
+          await page.waitForTimeout(2000);
+          if ((await confirmation.count().catch(() => 0)) > 0) confirmado = true;
+        }
+        break;
+      }
 
       await page.waitForTimeout(2000);
+    }
+
+    if (!confirmado) {
+      await page.waitForTimeout(3000);
+      confirmado = (await confirmation.count().catch(() => 0)) > 0;
     }
 
     if (confirmado) {
