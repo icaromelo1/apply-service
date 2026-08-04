@@ -233,7 +233,10 @@ export function startReviewServer(): void {
     if (req.method === "GET" && cvMatch) {
       const linha = carregar().find((l) => l.id === Number(cvMatch[1]));
       if (linha?.cvPath && existsSync(linha.cvPath)) {
-        res.writeHead(200, { "Content-Type": "application/pdf" });
+        res.writeHead(200, {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `inline; filename="${basename(linha.cvPath)}"`,
+        });
         createReadStream(linha.cvPath).pipe(res);
       } else {
         res.writeHead(404);

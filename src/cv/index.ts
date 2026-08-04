@@ -15,6 +15,23 @@ export interface CvGerado {
   sobMedida: boolean;
 }
 
+function pastaDaVaga(job: Job): string {
+  const bruto = job.id.replace(/^https?:\/\//, "").replace(/[^\w.-]+/g, "_");
+  return bruto.slice(0, 80) || "vaga";
+}
+
+function nomeDoArquivo(): string {
+  const candidato = config.candidato;
+  const partes = [candidato?.nome, candidato?.sobrenome].filter(Boolean).join(" ").trim();
+  const base = partes
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9 ]/g, "")
+    .trim()
+    .replace(/\s+/g, "_");
+  return `${base || "Curriculo"}_CV.pdf`;
+}
+
 export async function gerarCvParaVaga(job: Job): Promise<CvGerado> {
   const estatico = { caminho: config.paths.curriculoPath, score: null, sobMedida: false };
 
@@ -27,7 +44,7 @@ export async function gerarCvParaVaga(job: Job): Promise<CvGerado> {
     const cv = selecionarCv(base, requisitos, idioma);
     const score = calcularAderencia(cv, requisitos);
 
-    const destino = join(config.paths.cvsDir, `${job.id}.pdf`);
+    const destino = join(config.paths.cvsDir, pastaDaVaga(job), nomeDoArquivo());
     await renderizarPdf(cv, destino);
 
     console.log(`[cv] ${job.company}: aderência ${score.cobertura}% (${idioma})${score.aderente ? "" : " (abaixo do limiar)"}`);
