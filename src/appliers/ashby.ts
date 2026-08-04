@@ -97,15 +97,60 @@ export async function applyAshby(applicationId: number, job: Job): Promise<Apply
     }
 
     await enviar.click();
-    await page.waitForLoadState("networkidle", { timeout: 25000 }).catch(() => {});
 
-    const confirmacao = page.locator("text=/thank you|application (submitted|received)|we.ve received/i");
-    if ((await confirmacao.count()) > 0) {
+    const confirmacao = page.locator(
+      "text=/thank you|application (submitted|received)|we.ve received|obrigado/i",
+    );
+    const erros = page.locator('[role="alert"], [class*="error"]:visible, [aria-invalid="true"]');
+
+    let confirmado = false;
+    let mensagemErro = "";
+    const inicio = Date.now();
+
+    while (Date.now() - inicio < 60000) {
+      if ((await confirmacao.count().catch(() => 0)) > 0) {
+        confirmado = true;
+        break;
+      }
+
+      const textos = (await erros.allTextContents().catch(() => []))
+        .map((t) => t.trim())
+        .filter((t) => t.length > 3 && t.length < 200);
+      if (textos.length > 0) {
+        mensagemErro = [...new Set(textos)].join(" | ").slice(0, 220);
+        break;
+      }
+
+      if ((await enviar.count().catch(() => 0)) === 0) {
+        for (let i = 0; i < 6 && !confirmado; i++) {
+          await page.waitForTimeout(2000);
+          if ((await confirmacao.count().catch(() => 0)) > 0) confirmado = true;
+        }
+        break;
+      }
+
+      await page.waitForTimeout(2000);
+    }
+
+    if (!confirmado) {
+      await page.waitForTimeout(3000);
+      confirmado = (await confirmacao.count().catch(() => 0)) > 0;
+    }
+
+    if (confirmado) {
       const prova = await saveScreenshot(page, applicationId);
-      return { status: "applied", note: `confirmada — evidência: ${prova}`, aderencia: cv.score?.cobertura, cvPath: cv.sobMedida ? cv.caminho : undefined };
+      return {
+        status: "applied",
+        note: `confirmada — evidência: ${prova}`,
+        aderencia: cv.score?.cobertura,
+        cvPath: cv.sobMedida ? cv.caminho : undefined,
+      };
     }
 
     const shot = await saveScreenshot(page, applicationId);
+    if (mensagemErro) {
+      return { status: "needs_review", note: `form recusou o envio: ${mensagemErro} — ${shot}` };
+    }
     return { status: "needs_review", note: `envio sem confirmação clara — verificar — ${shot}` };
   } catch (err) {
     const shot = await saveScreenshot(page, applicationId).catch(() => "sem screenshot");

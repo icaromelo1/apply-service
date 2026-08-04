@@ -5,7 +5,7 @@ import { combina, ehDadoSensivel, normalize } from "./gupy-flow.js";
 
 const IGNORAR = /^(name|full name|email|resume|cv|first name|last name)\b/i;
 const EEO = /gender|race|ethnic|veteran|disability|pronoun|sexual orientation|age|transgender|diversity|community/i;
-const DECLINAR = /prefer not to (answer|say|disclose)|decline to self.?identify|i (don.t|do not) (wish|want) to answer|none of the above/i;
+const DECLINAR = /prefer not to (answer|say|disclose)|decline to self.?identify|i (don.t|do not) (wish|want) to answer|none of the above|i am not a protected veteran/i;
 const ESCOLHA_UNICA = /answer\s*1\s*of\s*\d|answer only one|responda apenas uma|do not answer more than one/i;
 
 type Tipo = "texto" | "dissertativa" | "radio" | "checkbox";
@@ -18,19 +18,35 @@ interface Campo {
   obrigatorio: boolean;
 }
 
+async function rotuloDaOpcao(entrada: Locator, item: Locator): Promise<string> {
+  const aninhado = normalize(await item.locator("xpath=ancestor::label[1]").textContent().catch(() => null));
+  if (aninhado) return aninhado;
+
+  const id = await item.getAttribute("id").catch(() => null);
+  if (id) {
+    const porFor = normalize(await entrada.locator(`label[for="${id}"]`).first().textContent().catch(() => null));
+    if (porFor) return porFor;
+  }
+
+  const irmao = normalize(
+    await item
+      .locator("xpath=following-sibling::*[self::label or self::span or self::div][1]")
+      .textContent()
+      .catch(() => null),
+  );
+  if (irmao) return irmao;
+
+  const pai = normalize(await item.locator("xpath=..").textContent().catch(() => null));
+  return pai.length <= 120 ? pai : "";
+}
+
 async function opcoesDoGrupo(entrada: Locator, seletor: string): Promise<string[]> {
   const itens = entrada.locator(seletor);
   const total = Math.min(await itens.count().catch(() => 0), 15);
   const opcoes: string[] = [];
 
   for (let i = 0; i < total; i++) {
-    const item = itens.nth(i);
-    const rotulo = normalize(
-      await item
-        .locator("xpath=ancestor::label[1]")
-        .textContent()
-        .catch(() => null),
-    );
+    const rotulo = await rotuloDaOpcao(entrada, itens.nth(i));
     if (rotulo) opcoes.push(rotulo);
   }
   return opcoes;
@@ -78,14 +94,24 @@ export async function coletarCamposAshby(page: Page): Promise<Campo[]> {
 }
 
 async function marcarOpcao(entrada: Locator, valor: string, opcoes: string[]): Promise<boolean> {
-  const escolhido = opcoes.find((o) => o.toLowerCase() === valor.toLowerCase()) ?? opcoes.find((o) => combina(valor, o));
-  if (!escolhido) return false;
+  const exato = opcoes.findIndex((o) => o.toLowerCase() === valor.toLowerCase());
+  const alvoIdx = exato >= 0 ? exato : opcoes.findIndex((o) => combina(valor, o));
+  if (alvoIdx < 0) return false;
 
-  const alvo = entrada.locator("label").filter({ hasText: escolhido }).first();
-  if ((await alvo.count().catch(() => 0)) === 0) return false;
+  const radio = entrada.locator("input[type=radio]").nth(alvoIdx);
+  if ((await radio.count().catch(() => 0)) > 0) {
+    await radio.check({ timeout: 4000, force: true }).catch(async () => {
+      await radio.click({ timeout: 4000, force: true }).catch(() => {});
+    });
+    if (await radio.isChecked().catch(() => false)) return true;
+  }
 
-  await alvo.click({ timeout: 4000 }).catch(() => {});
-  return true;
+  const porTexto = entrada.locator("label").filter({ hasText: opcoes[alvoIdx]! }).first();
+  if ((await porTexto.count().catch(() => 0)) > 0) {
+    await porTexto.click({ timeout: 4000 }).catch(() => {});
+    return await radio.isChecked().catch(() => false);
+  }
+  return false;
 }
 
 async function marcarCheckbox(entrada: Locator, valor: string): Promise<boolean> {
