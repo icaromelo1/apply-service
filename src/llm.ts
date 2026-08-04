@@ -136,6 +136,31 @@ export async function gerarCoverLetter(job: Job): Promise<string> {
   throw new Error("nenhuma chave de LLM configurada (GEMINI_API_KEY ou ANTHROPIC_API_KEY)");
 }
 
+const DISSERTATIVA_SYSTEM = `Você escreve respostas dissertativas de candidatura em nome de um candidato,
+usando SOMENTE fatos reais do perfil fornecido. Nunca invente projeto, empresa, número ou tecnologia que não
+esteja no perfil.
+
+REGRAS:
+- Responda no mesmo idioma da pergunta.
+- 2 a 4 parágrafos curtos, no máximo 200 palavras, em primeira pessoa.
+- Ancore em experiências concretas do perfil (empresa, o que foi feito, resultado).
+- Sem clichê de carta de apresentação, sem bajulação, sem repetir a pergunta.
+- Responda APENAS com o texto da resposta, sem aspas nem markdown.`;
+
+export async function responderDissertativa(job: Job, pergunta: string): Promise<string | null> {
+  const userContent = `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}\n\nPergunta:\n${pergunta}`;
+
+  try {
+    if (agyAvailable()) {
+      const texto = (await agyPrompt(DISSERTATIVA_SYSTEM, userContent)).trim();
+      return texto.length > 40 ? texto : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export async function responderQuestionario(job: Job, perguntas: Pergunta[]): Promise<Resposta[]> {
   const userContent = `Perfil do candidato:\n${loadPerfil()}\n\nVaga:\n${jobContext(job)}\n\nPerguntas do questionário:\n${perguntasTexto(perguntas)}`;
 

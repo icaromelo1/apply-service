@@ -3,7 +3,8 @@ import { config } from "../config.js";
 import { gerarCvParaVaga } from "../cv/index.js";
 import type { Job } from "../types.js";
 import { getBrowser, hasCaptcha, saveScreenshot, type ApplyOutcome } from "./browser.js";
-import { aceitarTermos, responderPerguntasGreenhouse } from "./greenhouse-perguntas.js";
+import { aceitarTermos } from "./greenhouse-perguntas.js";
+import { responderPerguntasAshby } from "./ashby-perguntas.js";
 
 async function preencher(page: import("playwright").Page, seletores: string[], valor: string): Promise<boolean> {
   for (const seletor of seletores) {
@@ -68,9 +69,16 @@ export async function applyAshby(applicationId: number, job: Job): Promise<Apply
     await upload.setInputFiles(cv.caminho);
     await page.waitForTimeout(2500);
 
-    const perguntas = await responderPerguntasGreenhouse(page, job);
+    const perguntas = await responderPerguntasAshby(page, job);
     if (perguntas.sensiveis.length > 0) {
       return { status: "skipped", note: `DESCARTADA — exige dado sensível: ${perguntas.sensiveis.join(" | ")}` };
+    }
+    if (perguntas.naoPreenchidas.length > 0) {
+      const shot = await saveScreenshot(page, applicationId);
+      return {
+        status: "needs_review",
+        note: `campo(s) obrigatório(s) não preenchido(s): ${perguntas.naoPreenchidas.join(" | ").slice(0, 200)} — ${shot}`,
+      };
     }
     if (perguntas.semResposta.length > 0) {
       const shot = await saveScreenshot(page, applicationId);
