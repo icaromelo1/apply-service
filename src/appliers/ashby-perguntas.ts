@@ -8,7 +8,7 @@ const EEO = /gender|race|ethnic|veteran|disability|pronoun|sexual orientation|ag
 const DECLINAR = /prefer not to (answer|say|disclose)|decline to self.?identify|i (don.t|do not) (wish|want) to answer|none of the above|i am not a protected veteran/i;
 const ESCOLHA_UNICA = /answer\s*1\s*of\s*\d|answer only one|responda apenas uma|do not answer more than one/i;
 
-type Tipo = "texto" | "dissertativa" | "radio" | "checkbox";
+type Tipo = "texto" | "dissertativa" | "radio" | "checkbox" | "data" | "busca";
 
 interface Campo {
   rotulo: string;
@@ -72,10 +72,15 @@ export async function coletarCamposAshby(page: Page): Promise<Campo[]> {
     const areas = await conta("textarea");
     const textos = await conta("input[type=text], input[type=tel], input[type=url]");
 
+    const datas = await conta("input[type=date], input[placeholder*='date' i], input[placeholder*='Pick' i]");
+    const buscas = await conta("input[placeholder*='Start typing' i], input[role=combobox], [class*='_select'] input");
+
     let tipo: Tipo | null = null;
     if (radios > 0) tipo = "radio";
     else if (checks > 0) tipo = "checkbox";
     else if (areas > 0) tipo = "dissertativa";
+    else if (datas > 0) tipo = "data";
+    else if (buscas > 0) tipo = "busca";
     else if (textos > 0) tipo = "texto";
     if (!tipo) continue;
 
@@ -134,6 +139,53 @@ async function marcarCheckbox(entrada: Locator, valor: string): Promise<boolean>
   return true;
 }
 
+function dataDeInicio(): string {
+  const d = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+async function preencherData(entrada: Locator, valor: string): Promise<boolean> {
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(valor.trim()) ? valor.trim() : dataDeInicio();
+  const campo = entrada.locator("input").first();
+  if ((await campo.count().catch(() => 0)) === 0) return false;
+
+  for (const formato of [iso, iso.split("-").reverse().join("/"), `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(0, 4)}`]) {
+    await campo.fill(formato).catch(() => {});
+    await campo.press("Enter").catch(() => {});
+    const atual = await campo.inputValue().catch(() => "");
+    if (atual.trim().length >= 8) return true;
+  }
+  return false;
+}
+
+async function preencherBusca(page: Page, entrada: Locator, valor: string): Promise<boolean> {
+  const campo = entrada.locator("input").first();
+  if ((await campo.count().catch(() => 0)) === 0) return false;
+
+  for (const termo of [valor, valor.split(",")[0]?.trim() ?? valor]) {
+    if (!termo) continue;
+    await campo.click({ timeout: 4000 }).catch(() => {});
+    await campo.fill("").catch(() => {});
+    await campo.type(termo, { delay: 60 }).catch(() => {});
+
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(500);
+      const opcoes = page.locator("[role=option], [class*='_option']");
+      const total = await opcoes.count().catch(() => 0);
+      if (total === 0) continue;
+
+      const textos = (await opcoes.allTextContents()).map(normalize);
+      if (textos.some((t) => /loading|carregando/i.test(t))) continue;
+
+      const idx = textos.findIndex((t) => combina(termo, t));
+      await opcoes.nth(idx >= 0 ? idx : 0).click().catch(() => {});
+      await page.waitForTimeout(400);
+      return true;
+    }
+  }
+  return false;
+}
+
 export interface ResultadoAshby {
   respondidas: number;
   semResposta: string[];
@@ -148,10 +200,29 @@ export async function responderPerguntasAshby(page: Page, job: Job): Promise<Res
 
   const resultado: ResultadoAshby = { respondidas: 0, semResposta: [], sensiveis: [], naoPreenchidas: [] };
 
-  for (const campo of campos.filter((c) => EEO.test(c.rotulo))) {
-    const declinar = campo.opcoes.find((o) => DECLINAR.test(o));
-    if (declinar && (await marcarOpcao(campo.entrada, declinar, campo.opcoes))) resultado.respondidas++;
-    else if (campo.obrigatorio) resultado.sensiveis.push(campo.rotulo);
+  const eeo = campos.filter((c) => EEO.test(c.rotulo));
+  if (eeo.length > 0) {
+    const respostasEeo = await responderQuestionario(
+      job,
+      eeo.map((c) => ({ pergunta: c.rotulo, opcoes: c.opcoes.length > 0 ? c.opcoes : undefined })),
+    ).catch(() => []);
+
+    for (const [i, campo] of eeo.entries()) {
+      const valor = respostasEeo[i]?.resposta ?? null;
+      let ok = false;
+
+      if (valor && !/^(null|undefined)$/i.test(valor.trim())) {
+        ok = await marcarOpcao(campo.entrada, valor, campo.opcoes);
+      }
+
+      if (!ok) {
+        const declinar = campo.opcoes.find((o) => DECLINAR.test(o));
+        if (declinar) ok = await marcarOpcao(campo.entrada, declinar, campo.opcoes);
+      }
+
+      if (ok) resultado.respondidas++;
+      else if (campo.obrigatorio) resultado.sensiveis.push(campo.rotulo);
+    }
   }
 
   const restantes = campos.filter((c) => !EEO.test(c.rotulo));
@@ -186,7 +257,11 @@ export async function responderPerguntasAshby(page: Page, job: Job): Promise<Res
           ? await marcarOpcao(campo.entrada, valor, campo.opcoes)
           : campo.tipo === "checkbox"
             ? await marcarCheckbox(campo.entrada, valor)
-            : await campo.entrada
+            : campo.tipo === "data"
+              ? await preencherData(campo.entrada, valor)
+              : campo.tipo === "busca"
+                ? await preencherBusca(page, campo.entrada, valor)
+                : await campo.entrada
                 .locator("input[type=text], input[type=tel], input[type=url]")
                 .first()
                 .fill(valor)

@@ -306,10 +306,23 @@ export async function responderPerguntasGreenhouse(page: Page, job: Job): Promis
   const eeo = campos.filter((c) => EEO.test(c.rotulo));
   const eeoSemSaida: string[] = [];
 
-  for (const campo of eeo) {
+  const respostasEeo =
+    eeo.length > 0
+      ? await responderQuestionario(
+          job,
+          eeo.map((c) => ({ pergunta: c.rotulo, opcoes: c.opcoes.length > 0 ? c.opcoes : undefined })),
+        ).catch(() => [])
+      : [];
+
+  for (const [idx, campo] of eeo.entries()) {
     let ok = false;
 
-    const declinar = opcaoDeclinar(campo.opcoes);
+    const doPerfil = respostasEeo[idx]?.resposta ?? null;
+    if (doPerfil && !/^(null|undefined)$/i.test(doPerfil.trim())) {
+      ok = await preencherSelect(page, campo.wrapper, doPerfil, campo.opcoes).catch(() => false);
+    }
+
+    const declinar = ok ? null : opcaoDeclinar(campo.opcoes);
     if (declinar) ok = await preencherSelect(page, campo.wrapper, declinar, campo.opcoes).catch(() => false);
 
     if (!ok) {
