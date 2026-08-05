@@ -110,6 +110,38 @@ export function combina(alvo: string, candidato: string): boolean {
   return false;
 }
 
+export async function escreverEmCampo(campo: Locator, texto: string): Promise<boolean> {
+  if ((await campo.count().catch(() => 0)) === 0) return false;
+
+  await campo.fill(texto).catch(() => {});
+  let valor = await campo.inputValue().catch(() => "");
+
+  if (valor.trim().length === 0) {
+    await campo.click({ timeout: 4000 }).catch(() => {});
+    await campo.pressSequentially(texto, { delay: 30 }).catch(() => {});
+    valor = await campo.inputValue().catch(() => "");
+  }
+
+  if (valor.trim().length === 0) {
+    await campo
+      .evaluate((el: unknown, conteudo: string) => {
+        const alvo = el as unknown as { value: string; tagName: string; dispatchEvent: (e: Event) => boolean };
+        const janela = globalThis as unknown as Record<string, { prototype: object }>;
+        const nome = alvo.tagName === "TEXTAREA" ? "HTMLTextAreaElement" : "HTMLInputElement";
+        const setter = Object.getOwnPropertyDescriptor(janela[nome]!.prototype, "value")?.set;
+        if (setter) setter.call(alvo, conteudo);
+        else alvo.value = conteudo;
+        for (const evento of ["input", "change", "blur"]) {
+          alvo.dispatchEvent(new Event(evento, { bubbles: true }));
+        }
+      }, texto)
+      .catch(() => {});
+    valor = await campo.inputValue().catch(() => "");
+  }
+
+  return valor.trim().length > 0;
+}
+
 export async function fillAnswer(group: Locator, resposta: string): Promise<boolean> {
   const parts = resposta
     .split(/\s*\|\s*/)
@@ -142,50 +174,8 @@ export async function fillAnswer(group: Locator, resposta: string): Promise<bool
     )
     .first();
 
-  const quantos = await textInput.count();
-  if (quantos > 0) {
-    let erro = "";
-    await textInput.fill(resposta).catch((e: unknown) => {
-      erro = e instanceof Error ? e.message.split("\n")[0]! : String(e);
-    });
-    let valor = await textInput.inputValue().catch(() => "");
-
-    if (valor.trim().length === 0) {
-      await textInput.click({ timeout: 4000 }).catch((e: unknown) => {
-        erro += ` | click: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`;
-      });
-      await textInput.pressSequentially(resposta, { delay: 30 }).catch((e: unknown) => {
-        erro += ` | digitar: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`;
-      });
-      valor = await textInput.inputValue().catch(() => "");
-    }
-
-    if (valor.trim().length === 0) {
-      await textInput
-        .evaluate((el: unknown, texto: string) => {
-          const campo = el as unknown as { value: string; tagName: string; dispatchEvent: (e: Event) => boolean };
-          const janela = globalThis as unknown as Record<string, { prototype: object }>;
-          const nome = campo.tagName === "TEXTAREA" ? "HTMLTextAreaElement" : "HTMLInputElement";
-          const setter = Object.getOwnPropertyDescriptor(janela[nome]!.prototype, "value")?.set;
-          if (setter) setter.call(campo, texto);
-          else campo.value = texto;
-          for (const evento of ["input", "change", "blur"]) {
-            campo.dispatchEvent(new Event(evento, { bubbles: true }));
-          }
-        }, resposta)
-        .catch((e: unknown) => {
-          erro += ` | nativo: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`;
-        });
-      valor = await textInput.inputValue().catch(() => "");
-    }
-
-    if (valor.trim().length === 0) {
-      const tag = await textInput
-        .evaluate((el) => `${el.tagName}[type=${el.getAttribute("type") ?? "-"}] ro=${el.hasAttribute("readonly")} dis=${el.hasAttribute("disabled")}`)
-        .catch(() => "?");
-      console.log(`[gupy][fill] falhou em ${quantos} campo(s) — ${tag} — erro: ${erro || "sem exceção, valor ficou vazio"}`);
-    }
-    return valor.trim().length > 0;
+  if ((await textInput.count()) > 0) {
+    return await escreverEmCampo(textInput, resposta);
   }
 
   const totalNoBloco = await group.locator("input, textarea, select").count().catch(() => 0);
@@ -221,7 +211,7 @@ async function corrigirSinalizados(page: Page, job: Job): Promise<number> {
   const total = Math.min(await marcadores.count().catch(() => 0), 12);
   if (total === 0 || !llmAvailable()) return 0;
 
-  const alvos: { pergunta: Pergunta; locator: Locator }[] = [];
+  const alvos: { pergunta: Pergunta; locator: Locator; direto?: boolean }[] = [];
 
   for (let i = 0; i < total; i++) {
     const bloco = marcadores
@@ -239,14 +229,20 @@ async function corrigirSinalizados(page: Page, job: Job): Promise<number> {
 
     const opcoes = await extrairOpcoes(bloco.first());
     const marca = `apply-alvo-${alvos.length}`;
-    await bloco
-      .first()
+
+    const controle = marcadores
+      .nth(i)
+      .locator("xpath=preceding::*[self::input or self::textarea or self::select][1]");
+    const temControle = (await controle.count().catch(() => 0)) > 0;
+
+    await (temControle ? controle.first() : bloco.first())
       .evaluate((el, m) => el.setAttribute("data-apply-alvo", m), marca)
       .catch(() => {});
 
     alvos.push({
       pergunta: { pergunta: rotulo, opcoes: opcoes.length > 0 ? opcoes : undefined },
       locator: page.locator(`[data-apply-alvo="${marca}"]`).first(),
+      direto: temControle,
     });
   }
 
@@ -272,7 +268,9 @@ async function corrigirSinalizados(page: Page, job: Job): Promise<number> {
       console.log(`[gupy][resp] "${resposta.pergunta.slice(0, 60)}" → SEM RESPOSTA`);
       continue;
     }
-    const ok = await fillAnswer(alvo.locator, valor).catch(() => false);
+    const ok = alvo.direto
+      ? await escreverEmCampo(alvo.locator, valor).catch(() => false)
+      : await fillAnswer(alvo.locator, valor).catch(() => false);
     console.log(`[gupy][resp] "${resposta.pergunta.slice(0, 50)}" → "${valor.slice(0, 45)}" | preencheu: ${ok}`);
     if (ok) preenchidos++;
   }
