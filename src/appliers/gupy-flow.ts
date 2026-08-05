@@ -190,9 +190,7 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
     );
   }
 
-  const answersJson = JSON.stringify(respostas, null, 2);
   const ehVazia = (r: string | null): boolean => r === null || /^(null|undefined)$/i.test(r.trim());
-  const semResposta = respostas.filter((r) => ehVazia(r.resposta));
 
   const naoPreenchidas: string[] = [];
   for (const [i, resposta] of respostas.entries()) {
@@ -208,6 +206,44 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
       );
     }
   }
+
+  const chave = (p: string): string => normalize(p).toLowerCase().slice(0, 80);
+  const jaVistas = new Set(extracted.map((e) => chave(e.pergunta.pergunta)));
+
+  for (let passada = 0; passada < 3; passada++) {
+    await page.waitForTimeout(1200);
+
+    const revelados = (await extractPerguntas(page)).filter((e) => !jaVistas.has(chave(e.pergunta.pergunta)));
+    if (revelados.length === 0) break;
+
+    console.log(`[gupy] passada ${passada + 1}: ${revelados.length} campo(s) revelado(s) por respostas anteriores`);
+    for (const r of revelados) jaVistas.add(chave(r.pergunta.pergunta));
+
+    const respostasNovas = await responderQuestionario(
+      job,
+      revelados.map((r) => r.pergunta),
+    );
+
+    for (const [i, resposta] of respostasNovas.entries()) {
+      const target = revelados[i];
+      const valor = resposta.resposta;
+      if (!target || valor === null || ehVazia(valor)) continue;
+
+      const ok = await fillAnswer(target.locator, valor).catch(() => false);
+      if (!ok) {
+        naoPreenchidas.push(
+          `"${resposta.pergunta.slice(0, 60)}" (revelado; resposta gerada: "${valor.slice(0, 60)}"; opções: ${
+            target.pergunta.opcoes?.slice(0, 4).join(" / ").slice(0, 120) ?? "nenhuma detectada"
+          })`,
+        );
+      }
+    }
+
+    respostas = [...respostas, ...respostasNovas];
+  }
+
+  const answersJson = JSON.stringify(respostas, null, 2);
+  const semResposta = respostas.filter((r) => ehVazia(r.resposta));
 
   if (naoPreenchidas.length > 0) {
     const shot = await saveScreenshot(page, applicationId);
