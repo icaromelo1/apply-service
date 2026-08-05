@@ -22,6 +22,12 @@ export interface EtapasResult {
   aguardandoHumano: number;
   semPendencia: number;
   falhas: number;
+  concluidas: number;
+}
+
+export interface EtapasOpcoes {
+  ignorarCooldown?: boolean;
+  maxEtapasPorVaga?: number;
 }
 
 const HORAS_ESPERA = 12;
@@ -83,8 +89,9 @@ async function tituloDaVaga(page: Page): Promise<string> {
   return "";
 }
 
-export async function resolverEtapasGupy(): Promise<EtapasResult> {
-  const result: EtapasResult = { avancadas: 0, aguardandoHumano: 0, semPendencia: 0, falhas: 0 };
+export async function resolverEtapasGupy(opcoes: EtapasOpcoes = {}): Promise<EtapasResult> {
+  const maxEtapas = opcoes.maxEtapasPorVaga ?? 6;
+  const result: EtapasResult = { avancadas: 0, aguardandoHumano: 0, semPendencia: 0, falhas: 0, concluidas: 0 };
   if (!existsSync(config.paths.gupySessionPath)) return result;
 
   const context = await (await getBrowser()).newContext({ storageState: config.paths.gupySessionPath });
@@ -120,74 +127,118 @@ export async function resolverEtapasGupy(): Promise<EtapasResult> {
       await page.waitForTimeout(2500);
     }
     const visitas = lerVisitas();
-    const pendentes = links.filter((l) => !emCooldown(visitas, l));
+    const pendentes = opcoes.ignorarCooldown ? links : links.filter((l) => !emCooldown(visitas, l));
     console.log(
       `[etapas] ${links.length} candidatura(s) em andamento — ${pendentes.length} a checar (${links.length - pendentes.length} em cooldown)`,
     );
 
     for (const link of pendentes) {
+      let avancadasAqui = 0;
+      let ultimoTitulo = "";
+
       try {
-        await page.goto(link, { waitUntil: "networkidle" });
-        await page.waitForTimeout(3000);
+        for (let volta = 0; volta < maxEtapas; volta++) {
+          await page.goto(link, { waitUntil: "networkidle" });
+          await page.waitForTimeout(3000);
 
-        const titulo = await tituloDaVaga(page);
+          const titulo = await tituloDaVaga(page);
+          if (titulo) ultimoTitulo = titulo;
 
-        const acao = page
-          .locator('button:has-text("Começar"), button:has-text("Responder"), a:has-text("Começar")')
-          .first();
-        if (!(await acao.isVisible().catch(() => false))) {
-          result.semPendencia++;
+          const acao = page
+            .locator('button:has-text("Começar"), button:has-text("Responder"), a:has-text("Começar")')
+            .first();
+
+          if (!(await acao.isVisible().catch(() => false))) {
+            if (avancadasAqui > 0) {
+              result.concluidas++;
+              anotarPorTitulo(
+                ultimoTitulo,
+                `${avancadasAqui} etapa(s) concluída(s) — sem pendência restante`,
+                "em dia",
+                "applied",
+              );
+            } else {
+              result.semPendencia++;
+            }
+            visitas[link] = new Date().toISOString();
+            gravarVisitas(visitas);
+            break;
+          }
+
+          await acao.click({ timeout: 5000 });
+          await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
+          await page.waitForTimeout(2000);
+
+          const url = page.url();
+          const slug = url.includes("/steps/") ? (url.split("/steps/")[1]?.split("/")[1] ?? "") : "";
+
+          if (exigeHumano(slug) || exigeHumano(normalize(await page.textContent("h1, h2").catch(() => "")))) {
+            const shot = await saveScreenshot(page, 0);
+            anotarPorTitulo(
+              ultimoTitulo,
+              `${avancadasAqui} etapa(s) automática(s) feita(s); etapa "${slug || "teste/entrevista"}" exige você — ${shot}`,
+              `aguardando você: ${slug || "teste/entrevista"}`,
+              "needs_review",
+            );
+            result.aguardandoHumano++;
+            visitas[link] = new Date().toISOString();
+            gravarVisitas(visitas);
+            break;
+          }
+
+          await dismissarModais(page);
+          await avancarIntro(page);
+
+          const job: Job = {
+            id: `etapa-${slug}`,
+            title: ultimoTitulo,
+            company: "",
+            location: "",
+            url: link,
+            source: "Gupy",
+            sources: ["Gupy"],
+            keyword: "",
+            keywords: [],
+          };
+
+          const outcome = await responderEEnviar(page, 0, job);
+          console.log(
+            `[etapas] ${ultimoTitulo} · etapa ${volta + 1} (${slug || "questionário"}) → ${outcome.status}${outcome.note ? ` (${outcome.note})` : ""}`,
+          );
+
+          if (outcome.status === "applied") {
+            result.avancadas++;
+            avancadasAqui++;
+            continue;
+          }
+
+          anotarPorTitulo(
+            ultimoTitulo,
+            `etapa ${slug || "questionário"} travou: ${outcome.note ?? outcome.status}`,
+            `travou: ${slug || "questionário"}`,
+            outcome.status === "skipped" ? "skipped" : "needs_review",
+          );
+          if (outcome.status === "failed") result.falhas++;
+          else result.aguardandoHumano++;
           visitas[link] = new Date().toISOString();
           gravarVisitas(visitas);
-          continue;
+          break;
         }
 
-        await acao.click({ timeout: 5000 });
-        await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
-        await page.waitForTimeout(2000);
-
-        const url = page.url();
-        const slug = url.includes("/steps/") ? (url.split("/steps/")[1]?.split("/")[1] ?? "") : "";
-
-        if (exigeHumano(slug) || exigeHumano(normalize(await page.textContent("h1, h2").catch(() => "")))) {
-          const shot = await saveScreenshot(page, 0);
-          anotarPorTitulo(titulo, `etapa exige você (${slug || "teste/entrevista"}) — ${shot}`, `aguardando você: ${slug || "teste/entrevista"}`);
-          result.aguardandoHumano++;
-          continue;
+        if (avancadasAqui >= maxEtapas) {
+          anotarPorTitulo(
+            ultimoTitulo,
+            `${avancadasAqui} etapas feitas seguidas — limite por execução atingido, checar no próximo ciclo`,
+            "em andamento",
+            "needs_review",
+          );
         }
-
-        await dismissarModais(page);
-        await avancarIntro(page);
-
-        const job: Job = {
-          id: `etapa-${slug}`,
-          title: titulo,
-          company: "",
-          location: "",
-          url: link,
-          source: "Gupy",
-          sources: ["Gupy"],
-          keyword: "",
-          keywords: [],
-        };
-
-        const outcome = await responderEEnviar(page, 0, job);
-        console.log(`[etapas] ${titulo} → ${outcome.status}${outcome.note ? ` (${outcome.note})` : ""}`);
-        anotarPorTitulo(
-          titulo,
-          `etapa ${slug || "questionário"}: ${outcome.status} — ${outcome.note ?? ""}`,
-          outcome.status === "applied" ? `avançou: ${slug || "questionário"}` : `travou: ${slug || "questionário"}`,
-          outcome.status === "applied" ? "applied" : outcome.status === "skipped" ? "skipped" : "needs_review",
-        );
-
-        if (outcome.status === "applied") result.avancadas++;
-        else if (outcome.status === "failed") result.falhas++;
-        else result.aguardandoHumano++;
       } catch (err) {
         console.error(`[etapas] falha em ${link}:`, err instanceof Error ? err.message : err);
         result.falhas++;
       }
     }
+
   } finally {
     await context.close();
   }
