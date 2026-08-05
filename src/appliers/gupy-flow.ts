@@ -166,6 +166,57 @@ export async function avancarIntro(page: Page): Promise<void> {
   }
 }
 
+async function corrigirSinalizados(page: Page, job: Job): Promise<number> {
+  const marcadores = page.locator("text=/campo obrigat[óo]rio/i");
+  const total = Math.min(await marcadores.count().catch(() => 0), 12);
+  if (total === 0 || !llmAvailable()) return 0;
+
+  const alvos: { pergunta: Pergunta; locator: Locator }[] = [];
+
+  for (let i = 0; i < total; i++) {
+    const bloco = marcadores
+      .nth(i)
+      .locator("xpath=ancestor::*[.//input or .//textarea or .//select][1]");
+    if ((await bloco.count().catch(() => 0)) === 0) continue;
+
+    const rotulo = normalize(await bloco.first().textContent().catch(() => null))
+      .replace(/campo obrigat[óo]rio/gi, "")
+      .replace(/^\d+\s*[.)]\s*/, "")
+      .replace(/\s*\*\s*/g, " ")
+      .trim();
+    if (!rotulo || rotulo.length < 5) continue;
+    if (alvos.some((a) => a.pergunta.pergunta === rotulo)) continue;
+
+    const opcoes = await extrairOpcoes(bloco.first());
+    alvos.push({
+      pergunta: { pergunta: rotulo, opcoes: opcoes.length > 0 ? opcoes : undefined },
+      locator: bloco.first(),
+    });
+  }
+
+  if (alvos.length === 0) return 0;
+  console.log(`[gupy] a Gupy sinalizou ${alvos.length} campo(s) obrigatório(s) — respondendo`);
+
+  const respostas = await responderQuestionario(
+    job,
+    alvos.map((a) => ({
+      pergunta: `${a.pergunta.pergunta} [CAMPO OBRIGATÓRIO — responda com um valor concreto do perfil; não devolva null]`,
+      opcoes: a.pergunta.opcoes,
+    })),
+  );
+
+  let preenchidos = 0;
+  for (const [i, resposta] of respostas.entries()) {
+    const alvo = alvos[i];
+    const valor = resposta.resposta;
+    if (!alvo || valor === null || /^(null|undefined)$/i.test(valor.trim())) continue;
+    if (await fillAnswer(alvo.locator, valor).catch(() => false)) preenchidos++;
+  }
+
+  console.log(`[gupy] ${preenchidos}/${alvos.length} campo(s) sinalizado(s) preenchido(s)`);
+  return preenchidos;
+}
+
 export async function responderEEnviar(page: Page, applicationId: number, job: Job): Promise<ApplyOutcome> {
   const responderAgora = page.locator('button:has-text("Responder agora")').first();
   if (await responderAgora.isVisible().catch(() => false)) {
@@ -389,7 +440,26 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
     return { status: "needs_review", note: `botão de envio não encontrado — ${shot}`, answers: answersJson };
   }
 
-  const obrigatorios = await page.locator("text=/campo obrigat[óo]rio/i").count();
+  let obrigatorios = await page.locator("text=/campo obrigat[óo]rio/i").count();
+
+  if (obrigatorios > 0 && (await corrigirSinalizados(page, job)) > 0) {
+    for (const text of submitTexts) {
+      const btn = page.locator(`button:has-text("${text}")`).first();
+      if (await btn.isVisible().catch(() => false)) {
+        await btn.click({ timeout: 5000 }).catch(() => {});
+        break;
+      }
+    }
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    if ((await confirmation.count()) > 0) {
+      const proof = await saveScreenshot(page, applicationId);
+      return { status: "applied", note: `confirmada após corrigir obrigatórios — evidência: ${proof}`, answers: answersJson };
+    }
+    obrigatorios = await page.locator("text=/campo obrigat[óo]rio/i").count();
+  }
+
   if (obrigatorios > 0) {
     return {
       status: "needs_review",
