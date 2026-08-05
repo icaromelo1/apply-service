@@ -26,6 +26,27 @@ export function ehDadoSensivel(pergunta: string): boolean {
   return DADOS_SENSIVEIS.some((r) => r.test(pergunta));
 }
 
+async function wrapperPreenchido(w: Locator): Promise<boolean> {
+  const marcaveis = w.locator("input[type=radio], input[type=checkbox]");
+  const nm = await marcaveis.count().catch(() => 0);
+  if (nm > 0) {
+    for (let i = 0; i < nm; i++) {
+      if (await marcaveis.nth(i).isChecked().catch(() => false)) return true;
+    }
+    return false;
+  }
+
+  const campos = w.locator("input:not([type=hidden]), textarea, select");
+  const nc = await campos.count().catch(() => 0);
+  if (nc === 0) return true;
+
+  for (let i = 0; i < nc; i++) {
+    const v = await campos.nth(i).inputValue().catch(() => "");
+    if (v.trim().length > 0) return true;
+  }
+  return false;
+}
+
 export async function extractPerguntas(page: Page): Promise<{ pergunta: Pergunta; locator: Locator }[]> {
   const result: { pergunta: Pergunta; locator: Locator }[] = [];
   const vistos = new Set<string>();
@@ -170,6 +191,24 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
 
   const extracted = await extractPerguntas(page);
 
+  if (extracted.length === 0) {
+    const controles = await page
+      .locator("input:not([type=hidden]):not([type=submit]), textarea, select")
+      .count()
+      .catch(() => 0);
+    if (controles > 0) {
+      const amostra: string[] = [];
+      const alvos = page.locator("input:not([type=hidden]):not([type=submit]), textarea, select");
+      for (let i = 0; i < Math.min(controles, 3); i++) {
+        const pai = alvos.nth(i).locator("xpath=ancestor::*[self::div or self::fieldset or self::li][1]");
+        const html = await pai.first().innerHTML().catch(() => "");
+        amostra.push(html.slice(0, 420));
+      }
+      console.log(`[gupy][diag] 0 perguntas extraídas mas ${controles} controle(s) no form. Amostra:`);
+      for (const a of amostra) console.log(`[gupy][diag] ${a.replace(/\s+/g, " ")}`);
+    }
+  }
+
   if (extracted.length > 0) {
     const campos = page.locator("form textarea, form input, textarea, input[type=text]");
     const total = await campos.count();
@@ -240,6 +279,37 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
     }
 
     respostas = [...respostas, ...respostasNovas];
+  }
+
+  const pendentes: { pergunta: Pergunta; locator: Locator }[] = [];
+  for (const campo of await extractPerguntas(page)) {
+    if (!(await wrapperPreenchido(campo.locator))) pendentes.push(campo);
+  }
+
+  if (pendentes.length > 0 && llmAvailable()) {
+    console.log(`[gupy] ${pendentes.length} campo(s) ainda vazio(s) antes do envio — segunda tentativa`);
+
+    const forcadas = await responderQuestionario(
+      job,
+      pendentes.map((p) => ({
+        pergunta: `${p.pergunta.pergunta} [CAMPO OBRIGATÓRIO — responda com um valor concreto tirado do perfil; não devolva null nem vazio]`,
+        opcoes: p.pergunta.opcoes,
+      })),
+    );
+
+    for (const [i, resposta] of forcadas.entries()) {
+      const alvo = pendentes[i];
+      const valor = resposta.resposta;
+      if (!alvo || valor === null || ehVazia(valor)) continue;
+      await fillAnswer(alvo.locator, valor).catch(() => false);
+    }
+
+    respostas = [...respostas, ...forcadas];
+  }
+
+  const aindaVazios: string[] = [];
+  for (const campo of pendentes) {
+    if (!(await wrapperPreenchido(campo.locator))) aindaVazios.push(campo.pergunta.pergunta.slice(0, 70));
   }
 
   const answersJson = JSON.stringify(respostas, null, 2);
@@ -323,7 +393,9 @@ export async function responderEEnviar(page: Page, applicationId: number, job: J
   if (obrigatorios > 0) {
     return {
       status: "needs_review",
-      note: `envio recusado: ${obrigatorios} campo(s) obrigatório(s) não preenchido(s) — o form usa opções que não casaram — ${shot}`,
+      note: `envio recusado: ${obrigatorios} campo(s) obrigatório(s) em branco${
+        aindaVazios.length > 0 ? ` — sem resposta para: ${aindaVazios.join(" | ").slice(0, 300)}` : ""
+      } — ${shot}`,
       answers: answersJson,
     };
   }
