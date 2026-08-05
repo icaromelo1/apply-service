@@ -131,14 +131,28 @@ export async function fillAnswer(group: Locator, resposta: string): Promise<bool
 
   const select = group.locator("select").first();
   if ((await select.count()) > 0) {
-    await select.selectOption({ label: resposta }).catch(() => select.selectOption(resposta));
-    return true;
+    await select.selectOption({ label: resposta }).catch(() => select.selectOption(resposta).catch(() => {}));
+    const escolhido = await select.inputValue().catch(() => "");
+    if (escolhido.trim().length > 0) return true;
   }
 
-  const textInput = group.locator("textarea, input[type=text], input[type=number]").first();
+  const textInput = group
+    .locator(
+      "textarea, input:not([type=radio]):not([type=checkbox]):not([type=hidden]):not([type=file]):not([type=submit]):not([type=button]):not([type=image])",
+    )
+    .first();
+
   if ((await textInput.count()) > 0) {
-    await textInput.fill(resposta);
-    return true;
+    await textInput.fill(resposta).catch(() => {});
+    let valor = await textInput.inputValue().catch(() => "");
+
+    if (valor.trim().length === 0) {
+      await textInput.click({ timeout: 4000 }).catch(() => {});
+      await textInput.type(resposta, { delay: 25 }).catch(() => {});
+      valor = await textInput.inputValue().catch(() => "");
+    }
+
+    return valor.trim().length > 0;
   }
   return false;
 }
@@ -196,6 +210,9 @@ async function corrigirSinalizados(page: Page, job: Job): Promise<number> {
 
   if (alvos.length === 0) return 0;
   console.log(`[gupy] a Gupy sinalizou ${alvos.length} campo(s) obrigatório(s) — respondendo`);
+  for (const a of alvos) {
+    console.log(`[gupy][campo] "${a.pergunta.pergunta.slice(0, 90)}" | opções: ${a.pergunta.opcoes?.join(" / ").slice(0, 90) ?? "-"}`);
+  }
 
   const respostas = await responderQuestionario(
     job,
@@ -209,8 +226,13 @@ async function corrigirSinalizados(page: Page, job: Job): Promise<number> {
   for (const [i, resposta] of respostas.entries()) {
     const alvo = alvos[i];
     const valor = resposta.resposta;
-    if (!alvo || valor === null || /^(null|undefined)$/i.test(valor.trim())) continue;
-    if (await fillAnswer(alvo.locator, valor).catch(() => false)) preenchidos++;
+    if (!alvo || valor === null || /^(null|undefined)$/i.test(valor.trim())) {
+      console.log(`[gupy][resp] "${resposta.pergunta.slice(0, 60)}" → SEM RESPOSTA`);
+      continue;
+    }
+    const ok = await fillAnswer(alvo.locator, valor).catch(() => false);
+    console.log(`[gupy][resp] "${resposta.pergunta.slice(0, 50)}" → "${valor.slice(0, 45)}" | preencheu: ${ok}`);
+    if (ok) preenchidos++;
   }
 
   console.log(`[gupy] ${preenchidos}/${alvos.length} campo(s) sinalizado(s) preenchido(s)`);
