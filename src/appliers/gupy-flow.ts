@@ -142,18 +142,54 @@ export async function fillAnswer(group: Locator, resposta: string): Promise<bool
     )
     .first();
 
-  if ((await textInput.count()) > 0) {
-    await textInput.fill(resposta).catch(() => {});
+  const quantos = await textInput.count();
+  if (quantos > 0) {
+    let erro = "";
+    await textInput.fill(resposta).catch((e: unknown) => {
+      erro = e instanceof Error ? e.message.split("\n")[0]! : String(e);
+    });
     let valor = await textInput.inputValue().catch(() => "");
 
     if (valor.trim().length === 0) {
-      await textInput.click({ timeout: 4000 }).catch(() => {});
-      await textInput.type(resposta, { delay: 25 }).catch(() => {});
+      await textInput.click({ timeout: 4000 }).catch((e: unknown) => {
+        erro += ` | click: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`;
+      });
+      await textInput.pressSequentially(resposta, { delay: 30 }).catch((e: unknown) => {
+        erro += ` | digitar: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`;
+      });
       valor = await textInput.inputValue().catch(() => "");
     }
 
+    if (valor.trim().length === 0) {
+      await textInput
+        .evaluate((el: unknown, texto: string) => {
+          const campo = el as unknown as { value: string; tagName: string; dispatchEvent: (e: Event) => boolean };
+          const janela = globalThis as unknown as Record<string, { prototype: object }>;
+          const nome = campo.tagName === "TEXTAREA" ? "HTMLTextAreaElement" : "HTMLInputElement";
+          const setter = Object.getOwnPropertyDescriptor(janela[nome]!.prototype, "value")?.set;
+          if (setter) setter.call(campo, texto);
+          else campo.value = texto;
+          for (const evento of ["input", "change", "blur"]) {
+            campo.dispatchEvent(new Event(evento, { bubbles: true }));
+          }
+        }, resposta)
+        .catch((e: unknown) => {
+          erro += ` | nativo: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`;
+        });
+      valor = await textInput.inputValue().catch(() => "");
+    }
+
+    if (valor.trim().length === 0) {
+      const tag = await textInput
+        .evaluate((el) => `${el.tagName}[type=${el.getAttribute("type") ?? "-"}] ro=${el.hasAttribute("readonly")} dis=${el.hasAttribute("disabled")}`)
+        .catch(() => "?");
+      console.log(`[gupy][fill] falhou em ${quantos} campo(s) — ${tag} — erro: ${erro || "sem exceção, valor ficou vazio"}`);
+    }
     return valor.trim().length > 0;
   }
+
+  const totalNoBloco = await group.locator("input, textarea, select").count().catch(() => 0);
+  console.log(`[gupy][fill] nenhum campo preenchível no bloco (controles totais: ${totalNoBloco})`);
   return false;
 }
 
@@ -202,9 +238,15 @@ async function corrigirSinalizados(page: Page, job: Job): Promise<number> {
     if (alvos.some((a) => a.pergunta.pergunta === rotulo)) continue;
 
     const opcoes = await extrairOpcoes(bloco.first());
+    const marca = `apply-alvo-${alvos.length}`;
+    await bloco
+      .first()
+      .evaluate((el, m) => el.setAttribute("data-apply-alvo", m), marca)
+      .catch(() => {});
+
     alvos.push({
       pergunta: { pergunta: rotulo, opcoes: opcoes.length > 0 ? opcoes : undefined },
-      locator: bloco.first(),
+      locator: page.locator(`[data-apply-alvo="${marca}"]`).first(),
     });
   }
 
