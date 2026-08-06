@@ -146,20 +146,9 @@ export async function resolverEtapasGupy(opcoes: EtapasOpcoes = {}): Promise<Eta
 
           const acao = page
             .locator(
-              [
-                'button:has-text("Começar")',
-                'button:has-text("Responder")',
-                'button:has-text("Iniciar")',
-                'button:has-text("Continuar")',
-                'button:has-text("Acessar")',
-                'button:has-text("Realizar")',
-                'button:has-text("Fazer")',
-                'button:has-text("Preencher")',
-                'a:has-text("Começar")',
-                'a:has-text("Responder")',
-                'a:has-text("Iniciar")',
-                'a:has-text("Realizar")',
-              ].join(", "),
+              ["Começar", "Responder", "Iniciar", "Continuar", "Acessar", "Realizar", "Fazer", "Preencher"]
+                .flatMap((t) => [`button:visible:has-text("${t}")`, `a:visible:has-text("${t}")`])
+                .join(", "),
             )
             .first();
 
