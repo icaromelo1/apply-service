@@ -145,10 +145,35 @@ export async function resolverEtapasGupy(opcoes: EtapasOpcoes = {}): Promise<Eta
           if (titulo) ultimoTitulo = titulo;
 
           const acao = page
-            .locator('button:has-text("Começar"), button:has-text("Responder"), a:has-text("Começar")')
+            .locator(
+              [
+                'button:has-text("Começar")',
+                'button:has-text("Responder")',
+                'button:has-text("Iniciar")',
+                'button:has-text("Continuar")',
+                'button:has-text("Acessar")',
+                'button:has-text("Realizar")',
+                'button:has-text("Fazer")',
+                'button:has-text("Preencher")',
+                'a:has-text("Começar")',
+                'a:has-text("Responder")',
+                'a:has-text("Iniciar")',
+                'a:has-text("Realizar")',
+              ].join(", "),
+            )
             .first();
 
           if (!(await acao.isVisible().catch(() => false))) {
+            if (avancadasAqui === 0) {
+              const botoes = page.locator("button:visible, a[role=button]:visible");
+              const quantos = Math.min(await botoes.count().catch(() => 0), 10);
+              const textos: string[] = [];
+              for (let b = 0; b < quantos; b++) {
+                const t = normalize(await botoes.nth(b).textContent().catch(() => null)).slice(0, 28);
+                if (t) textos.push(t);
+              }
+              console.log(`[etapas][sem-acao] ${ultimoTitulo.slice(0, 45)} → botões: ${textos.join(" · ") || "nenhum"}`);
+            }
             if (avancadasAqui > 0) {
               result.concluidas++;
               anotarPorTitulo(
