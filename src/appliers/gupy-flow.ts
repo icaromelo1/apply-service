@@ -183,6 +183,28 @@ export async function fillAnswer(group: Locator, resposta: string): Promise<bool
   return false;
 }
 
+export async function reutilizarTesteAnterior(page: Page): Promise<boolean> {
+  const reaproveitar = page
+    .locator('button:visible:has-text("Sim, quero utilizar"), button:visible:has-text("quero utilizar")')
+    .first();
+
+  if (!(await reaproveitar.isVisible().catch(() => false))) return false;
+
+  const quando = normalize(
+    await page
+      .locator("text=/respondeu esse teste no dia/i")
+      .first()
+      .textContent()
+      .catch(() => null),
+  );
+
+  console.log(`[gupy] teste já respondido pelo candidato — reaproveitando resultado (${quando || "data não informada"})`);
+  await reaproveitar.click({ timeout: 6000 }).catch(() => {});
+  await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(2500);
+  return true;
+}
+
 export async function dismissarModais(page: Page): Promise<void> {
   const dismiss = page.locator('button:has-text("Me lembrar depois"), a:has-text("Me lembrar depois")').first();
   if (await dismiss.isVisible().catch(() => false)) {

@@ -7,7 +7,7 @@ import { db } from "../db/index.js";
 import { applications, jobs } from "../db/schema.js";
 import type { Job } from "../types.js";
 import { getBrowser, saveScreenshot } from "./browser.js";
-import { avancarIntro, dismissarModais, normalize, responderEEnviar } from "./gupy-flow.js";
+import { avancarIntro, dismissarModais, normalize, responderEEnviar, reutilizarTesteAnterior } from "./gupy-flow.js";
 
 const ETAPA_RESPONDIVEL = /curricul|question|formul|cadastr|dados|fit cultural|mapeamento comportamental|perfil \(pda\)|alinhamento de expectativas|prefer[êe]ncia/i;
 const ETAPA_HUMANA = /test|avalia|entrevista|interview|v[íi]deo|video|bate.?papo|case|desafio|oferta|proposta|admiss|integra/i;
@@ -182,6 +182,13 @@ export async function resolverEtapasGupy(opcoes: EtapasOpcoes = {}): Promise<Eta
           await acao.click({ timeout: 5000 });
           await page.waitForLoadState("networkidle", { timeout: 20000 }).catch(() => {});
           await page.waitForTimeout(2000);
+
+          const reaproveitou = await reutilizarTesteAnterior(page);
+          if (reaproveitou) {
+            result.avancadas++;
+            avancadasAqui++;
+            continue;
+          }
 
           const url = page.url();
           const slug = url.includes("/steps/") ? (url.split("/steps/")[1]?.split("/")[1] ?? "") : "";
