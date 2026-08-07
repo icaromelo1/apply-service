@@ -39,7 +39,7 @@ try {
   }
   console.log(`[auditoria] abas/botões na página: ${rotulos.join(" · ")}`);
 
-  for (const aba of ["Em andamento", "Finalizadas", "Encerradas", "Concluídas", "Todas"]) {
+  for (const aba of ["Em andamento", "Em banco de talentos", "Finalizadas"]) {
     const antes = textosPortal.length;
     const tab = page.locator(`button:visible:has-text("${aba}"), [role=tab]:visible:has-text("${aba}")`).first();
     if (!(await tab.isVisible().catch(() => false))) {
@@ -52,12 +52,13 @@ try {
     }
 
     for (let pagina = 0; pagina < 15; pagina++) {
-      const cards = page.locator("li, article").filter({ has: page.locator('a:has-text("Ver andamento")') });
-      const total = await cards.count().catch(() => 0);
+      const cards = page.locator("li:visible, article:visible");
+      const total = Math.min(await cards.count().catch(() => 0), 120);
 
       for (let i = 0; i < total; i++) {
         const texto = normalize(await cards.nth(i).textContent().catch(() => null));
-        if (!texto) continue;
+        if (!texto || texto.length < 40) continue;
+        if (/aplicar filtros|limpar filtros|^em andamento$/i.test(texto)) continue;
         textosPortal.push(`${aba}|${texto}`);
       }
 
