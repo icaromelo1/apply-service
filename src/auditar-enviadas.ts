@@ -10,8 +10,7 @@ const chave = (t: string): string =>
     .toLowerCase()
     .replace(/[^\wà-ú\s]/g, "")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 60);
+    .trim();
 
 const noBanco = db
   .select({ titulo: jobs.title, empresa: jobs.company, status: applications.status, metodo: applications.method })
@@ -26,8 +25,7 @@ const context = await (await getBrowser()).newContext({ storageState: config.pat
 const page = await context.newPage();
 page.setDefaultTimeout(25000);
 
-const noPortal = new Map<string, string>();
-
+const textosPortal: string[] = [];
 try {
   await page.goto("https://portal.gupy.io/my/applications", { waitUntil: "networkidle" });
   await page.waitForTimeout(3000);
@@ -46,8 +44,7 @@ try {
       for (let i = 0; i < total; i++) {
         const texto = normalize(await cards.nth(i).textContent().catch(() => null));
         if (!texto) continue;
-        const titulo = texto.split(/\s{2,}|·|\|/)[0] ?? texto;
-        noPortal.set(chave(titulo), `${aba}: ${texto.slice(0, 90)}`);
+        textosPortal.push(`${aba}|${texto}`);
       }
 
       const proxima = page
@@ -63,20 +60,21 @@ try {
   await closeBrowser().catch(() => {});
 }
 
-console.log(`[auditoria] portal mostra: ${noPortal.size} candidatura(s)\n`);
+const portalNormalizado = textosPortal.map((t) => chave(t));
+console.log(`[auditoria] portal mostra: ${textosPortal.length} cartão(ões)\n`);
 
-const ausentes = noBanco.filter((r) => !noPortal.has(chave(r.titulo)));
+const achaNoPortal = (titulo: string): boolean => {
+  const alvo = chave(titulo);
+  if (alvo.length < 8) return false;
+  const curto = alvo.slice(0, 40);
+  return portalNormalizado.some((t) => t.includes(curto));
+};
+
+const ausentes = noBanco.filter((r) => !achaNoPortal(r.titulo));
 
 if (ausentes.length === 0) {
-  console.log("[auditoria] OK — toda candidatura marcada como enviada existe no portal da Gupy");
+  console.log(`[auditoria] OK — todas as ${noBanco.length} marcadas como enviadas existem no portal`);
 } else {
-  console.log(`[auditoria] ATENÇÃO — ${ausentes.length} marcada(s) como enviada(s) mas NÃO encontrada(s) no portal:`);
+  console.log(`[auditoria] ATENÇÃO — ${ausentes.length} de ${noBanco.length} marcadas como enviadas NÃO encontradas no portal:`);
   for (const r of ausentes) console.log(`   ${r.empresa} — ${r.titulo.slice(0, 60)}`);
-}
-
-const titulosBanco = new Set(noBanco.map((r) => chave(r.titulo)));
-const soNoPortal = [...noPortal.entries()].filter(([k]) => !titulosBanco.has(k));
-if (soNoPortal.length > 0) {
-  console.log(`\n[auditoria] ${soNoPortal.length} no portal que o banco não conta como enviada:`);
-  for (const [, v] of soNoPortal.slice(0, 15)) console.log(`   ${v}`);
 }
