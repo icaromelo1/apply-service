@@ -30,9 +30,23 @@ try {
   await page.goto("https://portal.gupy.io/my/applications", { waitUntil: "networkidle" });
   await page.waitForTimeout(3000);
 
-  for (const aba of ["Em andamento", "Finalizadas"]) {
-    const tab = page.locator(`button:has-text("${aba}"), [role=tab]:has-text("${aba}")`).first();
-    if (await tab.isVisible().catch(() => false)) {
+  const abasVisiveis = page.locator('button:visible, [role=tab]:visible');
+  const nAbas = Math.min(await abasVisiveis.count().catch(() => 0), 12);
+  const rotulos: string[] = [];
+  for (let a = 0; a < nAbas; a++) {
+    const t = normalize(await abasVisiveis.nth(a).textContent().catch(() => null)).slice(0, 25);
+    if (t) rotulos.push(t);
+  }
+  console.log(`[auditoria] abas/botões na página: ${rotulos.join(" · ")}`);
+
+  for (const aba of ["Em andamento", "Finalizadas", "Encerradas", "Concluídas", "Todas"]) {
+    const antes = textosPortal.length;
+    const tab = page.locator(`button:visible:has-text("${aba}"), [role=tab]:visible:has-text("${aba}")`).first();
+    if (!(await tab.isVisible().catch(() => false))) {
+      console.log(`[auditoria] aba "${aba}" não existe`);
+      continue;
+    }
+    {
       await tab.click().catch(() => {});
       await page.waitForTimeout(2500);
     }
@@ -54,6 +68,7 @@ try {
       await proxima.click().catch(() => {});
       await page.waitForTimeout(2500);
     }
+    console.log(`[auditoria] aba "${aba}": ${textosPortal.length - antes} cartão(ões)`);
   }
 } finally {
   await context.close();
