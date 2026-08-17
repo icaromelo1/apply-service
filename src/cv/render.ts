@@ -126,7 +126,7 @@ export function montarHtml(cv: CvSelecionado): string {
   const t = SECOES[cv.idioma ?? "pt"];
   return `
     <!DOCTYPE html>
-    <html lang="pt-BR">
+    <html lang="${cv.idioma === "en" ? "en" : "pt-BR"}">
       <head>
         <meta charset="utf-8" />
         <title>${esc(cv.contato.nome)}</title>

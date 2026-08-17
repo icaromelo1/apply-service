@@ -94,3 +94,10 @@ if (ausentes.length === 0) {
   console.log(`[auditoria] ATENÇÃO — ${ausentes.length} de ${noBanco.length} marcadas como enviadas NÃO encontradas no portal:`);
   for (const r of ausentes) console.log(`   ${r.empresa} — ${r.titulo.slice(0, 60)}`);
 }
+
+const alvos = ["casar", "inmetrics"];
+for (const a of alvos) {
+  const achados = textosPortal.filter((t) => t.toLowerCase().includes(a));
+  console.log(`\n[auditoria][busca "${a}"] ${achados.length} cartão(ões):`);
+  for (const t of achados.slice(0, 3)) console.log(`   ${t.slice(0, 150)}`);
+}
