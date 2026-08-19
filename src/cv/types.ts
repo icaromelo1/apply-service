@@ -6,6 +6,7 @@ export interface Contato {
   telefone: string;
   linkedin: string;
   github: string;
+  portfolio?: string;
 }
 
 export type Idioma = "pt" | "en";

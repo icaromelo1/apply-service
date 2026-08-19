@@ -28,7 +28,8 @@ function montarContato(cv: CvSelecionado): string {
     cv.contato.telefone,
     cv.contato.linkedin,
     cv.contato.github,
-  ].filter((p) => p && p.trim().length > 0);
+    cv.contato.portfolio,
+  ].filter((p): p is string => Boolean(p && p.trim().length > 0));
   return partes.map(esc).join(" &middot; ");
 }
 
